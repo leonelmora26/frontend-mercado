@@ -46,15 +46,6 @@
                                 <button @click="imprimirticket(props.row)" class="edi">
                                 <i class="fa-solid fa-print"></i>
                             </button>
-                            <button @click="EditarTicket(props.row._id)" class="edi">
-                                <i class="fa-solid fa-pencil"></i>
-                            </button>
-                            <button @click="InactivarTicket(props.row._id)" v-if="props.row.estado == 1" class="inac">
-                                <i class="fa-solid fa-xmark"></i>
-                            </button>
-                            <button @click="ActivarTicket(props.row._id)" v-else class="act">
-                                <i class="fa-solid fa-check"></i>
-                            </button>
                             </q-td>
                         </template>
                     </q-table>
@@ -68,12 +59,9 @@
 import axios from "axios";
 import { ref, onMounted } from "vue"
 import { useUsuarioStore } from "../stores/usuario.js"
-import {useImpuestoStore} from "../stores/impuesto.js"
-import {useProductoStore} from "../stores/producto.js"
 import { useQuasar } from "quasar";
 import { useRouter } from "vue-router";
-const ImpuestoStore = useImpuestoStore();
-const ProductoStore= useProductoStore();
+
 const UsuarioStore = useUsuarioStore();
 const $q = useQuasar();
 const router = useRouter();
@@ -93,85 +81,38 @@ async function obtenerInfo() {
     };
 };
 
-async function obtenerproducto() {
-    try {
-        // Llamada para obtener los productos desde el store
-        await ProductoStore.obtenerproductos();
-        // Verificar si el producto se obtuvo correctamente
-        if (!ProductoStore.productos || ProductoStore.productos.length === 0) {
-            console.log('Error: No se han obtenido productos o la respuesta es vacía.');
-            $q.notify({
-                type: 'negative',
-                message: 'Error: No se han obtenido productos.'
-            });
-            return; // Salir de la función si no hay productos
-        }
-
-        // Filtrar los productos con los campos que necesitas
-        const productosFiltrados = ProductoStore.productos.map((producto) => ({
-            nombre: producto.nombre,
-            identificacion: producto.identificacion,
-            // codigo_producto: producto.codigo_producto || 'Falta código',
-            // cantidad: producto.cantidad || 'Falta cantidad',
-            // valor_unitario: producto.valor_unitario || 'Falta valor',
-            // // codigo_impuesto_cargo: producto.impuesto_id?.codigo_impuesto_cargo || 'Falta código impuesto',
-            // // retencion: producto.impuesto_id?.retencion || 'Falta retención',
-            // // valor_retencion: producto.impuesto_id?.valor_retencion || 'Falta valor retención',
-            // // reteica: producto.impuesto_id?.reteica || 'Falta reteica',
-            // // valor_reteica: producto.impuesto_id?.valor_reteica || 'Falta valor reteica',
-            // // porcentaje_descuento: producto.porcentaje_descuento || 'Falta descuento',
-            // fecha_vencimiento: producto.fecha_vencimiento || 'Falta fecha vencimiento',
-            // fecha_elaboracion: producto.fecha_elaboracion || 'Falta fecha elaboración',
-        }));
-
-        // Asigna los productos filtrados a las filas de la tabla
-        rows.value = productosFiltrados;
-    } catch (error) {
-        console.log('Error al obtener los productos:', error);
-        $q.notify({
-            type: 'negative',
-            message: 'Error al obtener los productos'
-        });
-    }
-}
-obtenerproducto();
-
-
 const columns = [
-    { name: 'nombre', label: 'Nombre Contacto', sortable:true, align: 'left',},
-    { name: 'identificacion', label: 'Identificación', sortable:true, align: 'left', },
+    { name: 'nombre', label: 'Nombre Contacto', field: "nombre",sortable:true, align: 'left',},
+    { name: 'identificacion', label: 'Identificación', field: "identificacion", sortable:true, align: 'left', },
     { name: 'codigo_producto', label: 'Código Producto	', field: (row) => {
-        return row.producto_id.codigo_producto ? row.producto_id.codigo_producto : 'Falta el nombre de este usuario '; // verificar si el nombre existe
+        return row.idProducto.codigo_producto ? row.idProducto.codigo_producto : 'Falta el nombre de este usuario '; // verificar si el nombre existe
     }, sortable:true, align: 'left',},
-    { name: 'cantidad', label: 'Cantidad', field: (row) => {
-        return row.producto_id.cantidad? row.producto_id.cantidad : 'Falta el nombre de este usuario '; // verificar si el nombre existe
-    }, sortable:true, align: 'left', },
     { name: 'valor_unitario', label: 'Valor Uni',  field: (row) => {
-        return row.producto_id.valor_unitario ? row.producto_id.valor_unitario  : 'Falta el nombre de este usuario '; // verificar si el nombre existe
+        return row.idProducto.valor_unitario ? row.idProducto.valor_unitario  : 'Falta el nombre de este usuario '; // verificar si el nombre existe
     }, sortable:true, align: 'left', }, 
     { name: 'codigo_impuesto_cargo', label: 'Codigo impuesto cargo',  field: (row) => {
-        return row.impuesto_id.codigo_impuesto_cargo ? row.impuesto_id.codigo_impuesto_cargo : 'Falta el nombre de este usuario '; // verificar si el nombre existe
+        return row.idImpuesto.codigo_impuesto_cargo ? row.idImpuesto.codigo_impuesto_cargo : 'Falta el nombre de este usuario '; // verificar si el nombre existe
     }, sortable:true, align: 'left', },
     { name: 'retencion', label: 'Retención',  field: (row) => {
-        return row.impuesto_id.retencion ? row.impuesto_id.retencion : 'Falta el nombre de este usuario '; // verificar si el nombre existe
+        return row.idImpuesto.retencion ? row.idImpuesto.retencion : 'Falta el nombre de este usuario '; // verificar si el nombre existe
     }, sortable:true, align: 'left', }, 
     { name: 'valor_retencion', label: 'Valor Retención',  field: (row) => {
-        return row.impuesto_id.valor_retencion ? row.impuesto_id.valor_retencion : 'Falta el nombre de este usuario '; // verificar si el nombre existe
+        return row.idImpuesto.valor_retencion ? row.idImpuesto.valor_retencion : 'Falta el nombre de este usuario '; // verificar si el nombre existe
     }, sortable:true, align: 'left', },
     { name: 'reteica', label: 'Reteica',  field: (row) => {
-        return row.impuesto_id.reteica ? row.impuesto_id.reteica : 'Falta el nombre de este usuario '; // verificar si el nombre existe
+        return row.idImpuesto.reteica ? row.idImpuesto.reteica : 'Falta el nombre de este usuario '; // verificar si el nombre existe
     }, sortable:true, align: 'left', },
     { name: 'valor_reteica', label: 'Valor Reteica',  field: (row) => {
-        return row.impuesto_id.valor_reteica ? row.impuesto_id.valor_reteica : 'Falta el nombre de este usuario '; // verificar si el nombre existe
+        return row.idImpuesto.valor_reteica ? row.idImpuesto.valor_reteica : 'Falta el nombre de este usuario '; // verificar si el nombre existe
     }, sortable:true, align: 'left', },
     { name: 'porcentaje_descuento', label: 'Porcentaje Descuento',  field: (row) => {
-        return row.impuesto_id.porcentaje_descuento ? row.impuesto_id.porcentaje_descuento : 'Falta el nombre de este usuario '; // verificar si el nombre existe
+        return row.idImpuesto.porcentaje_descuento ? row.idImpuesto.porcentaje_descuento : 'Falta el nombre de este usuario '; // verificar si el nombre existe
     }, sortable:true, align: 'left', },
     { name: 'fecha_vencimiento', label: 'Fecha Vencimiento',  field: (row) => {
-        return row.producto_id.fecha_vencimiento ? row.producto_id.fecha_vencimiento : 'Falta el nombre de este usuario '; // verificar si el nombre existe
+        return row.idProducto.fecha_vencimiento ? row.idProducto.fecha_vencimiento : 'Falta el nombre de este usuario '; // verificar si el nombre existe
     }, sortable:true, align: 'left', },
     { name: 'fecha_elaboracion', label: 'Fecha Elaboración',  field: (row) => {
-        return row.producto_id.fecha_elaboracion ? row.producto_id.fecha_elaboracion : 'Falta el nombre de este usuario '; // verificar si el nombre existe
+        return row.idProducto.fecha_elaboracion ? row.idProducto.fecha_elaboracion : 'Falta el nombre de este usuario '; // verificar si el nombre existe
     }, sortable:true, align: 'left', },
     { name: 'iron', label: 'Anidar', sortable:true, align: 'left', },
     {
@@ -183,17 +124,17 @@ const columns = [
     }
 
 ];
-
+ 
 onMounted(async () => {
     obtenerInfo();
 });
 
 </script>
-<!-- <script>
+ <script>
+ 
 export default {
     methods: {
-        async printTicket() {
-            const { jsPDF } = window.jspdf;
+        async imprimirticket() {
             const doc = new jsPDF({
                 orientation: "portrait",
                 unit: "mm",
@@ -267,7 +208,7 @@ export default {
         },
     },
 };
-</script> -->
+</script>
 
 <style scoped>
 .container {

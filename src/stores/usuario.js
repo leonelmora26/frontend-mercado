@@ -6,7 +6,7 @@ export const useUsuarioStore = defineStore('usuario', () => {
   const usuarios = ref([]);
   const obtenerusuario = async () => {
     try {
-      let responseusuario = await axios.get('usuario/all');
+      let responseusuario = await axios.get('api/usuario/all');
       console.log('Datos recibidos:', responseusuario.data.usuario); // Log para verificar los datos
       usuarios.value = responseusuario.data.usuario;
       return responseusuario.data.usuario;
