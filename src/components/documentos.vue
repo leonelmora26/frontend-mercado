@@ -1,57 +1,195 @@
 <template>
-    <div class="container"> <!-- Asegúrate de que el contenedor tenga esta clase -->
+    <div class="container">
         <div class="superior">
             <div class="titulo">Subir Archivo CSV</div>
             <div>Subir Archivo CSV:</div>
             <div>
                 <div class="seleccionar">
-                    <button @click="subir()" class="btn">Seleccionar el archivo</button>
+                    <button @click="subir()" class="btn"
+                        style="background-color: #007BFF; font-weight: bold; color: white; width: 25%; height: 30%;">Seleccionar
+                        el archivo</button>
                     <div>Ningún archivo Seleccionado</div>
-                </div>
-                <div class="botones">
-                    <button @click="subir()" class="btn full-width"
-                        style="background-color: #007BFF;font-style: bold; color: white;">Enviar Facturas Anidadas a
-                        Alegra</button>
-                    <button @click="subir()" class="btn full-width"
-                        style="background-color: #28a745;font-style: bold; color: white;"> Enviar Facturas simples a
-                        Alegra</button>
-                    <button @click="subir()" class="btn full-width"
-                        style="background-color: #28a745;font-style: bold; color: white;">Procesar Datos</button>
-                    <button @click="subir()" class="btn full-width"
-                    style="background-color: #dd0910;font-style: bold; color: white;">Limpiar Base de Datos</button>
-                    <button @click="subir()" class="btn full-width" 
-                        style="background-color: #007BFF;font-style: bold; color: white;">Subir</button>
                 </div>
             </div>
             <div>
-                <button @click="printTicket" class="full-width">Imprimir Ticket</button>
+                <button @click="printTicket" style="width: 14%; height: 10%; padding: 1%;">Imprimir Ticket</button>
             </div>
-            <div class="q-pa-md">
 
-<q-table class="my-sticky-virtscroll-table" virtual-scroll flat bordered v-model:pagination="pagination"
-  :rows-per-page-options="[0]" :virtual-scroll-sticky-size-start="48" row-key="index" :rows="rows"
-  :columns="columns">
-  <template v-slot:body-cell-estado="props">
-    <q-td :props="props">
-      <label for="" v-if="props.row.estado == 1" style="color: green">Activo</label>
-      <label for="" v-else style="color: red">Inactivo</label>
-    </q-td>
-  </template>
-  <template v-slot:body-cell-opciones="props">
-    <q-td :props="props" class="botones">
-      <q-btn color="white" text-color="black" label="🖋️" @click="editarFicha(props.row)" />
-      <q-btn glossy label="❌" @click="inactivarFicha(props.row._id)" v-if="props.row.estado == 1" />
-      <q-btn glossy label="✔️" @click="activarFicha(props.row._id)" v-else />
-    </q-td>
-  </template>
-</q-table>
+            <!-- Tabla -->
+            <div style="width: 90vw;">
+                <div class="btn-agregar">
+                    <button @click="subir()" class="btn" style="color: white; width: 18%;">Enviar Facturas Anidadas a
+                        Alegra</button>
+                    <button @click="subir()" class="btn" style="color: white; width: 18%;">Enviar Facturas simples a
+                        Alegra</button>
+                    <button @click="subir()" class="btn" style="color: white; width: 18%;">Procesar Datos</button>
+                    <button @click="subir()" class="btn" style="color: white; width: 18%;">Limpiar Base de
+                        Datos</button>
+                    <button @click="subir()" class="btn" style="color: white; width: 18%;">Subir</button>
+                </div>
 
-</div>
+                <div class="q-pa-md">
+                    <q-table class="my-sticky-virtscroll-table" virtual-scroll flat bordered
+                        v-model:pagination="pagination" :rows-per-page-options="[0]"
+                        :virtual-scroll-sticky-size-start="48" row-key="name" :rows="rows" :columns="columns">
+                        <!-- Columna para el estado -->
+                        <template v-slot:body-cell-estado="props">
+                            <q-td :props="props">
+                                <label v-if="props.row.estado == 1" style="color: green">Activo</label>
+                                <label v-else style="color: red">Inactivo</label>
+                            </q-td>
+                        </template>
+
+                        <!-- Columna para las opciones de editar/activar/inactivar -->
+                        <template v-slot:body-cell-opciones="props">
+                            <q-td :props="props" class="botones">
+                                <button @click="imprimirticket(props.row)" class="edi">
+                                <i class="fa-solid fa-print"></i>
+                            </button>
+                            <button @click="EditarTicket(props.row._id)" class="edi">
+                                <i class="fa-solid fa-pencil"></i>
+                            </button>
+                            <button @click="InactivarTicket(props.row._id)" v-if="props.row.estado == 1" class="inac">
+                                <i class="fa-solid fa-xmark"></i>
+                            </button>
+                            <button @click="ActivarTicket(props.row._id)" v-else class="act">
+                                <i class="fa-solid fa-check"></i>
+                            </button>
+                            </q-td>
+                        </template>
+                    </q-table>
+                </div>
+            </div>
         </div>
     </div>
 </template>
 
-<script>
+<script setup>
+import axios from "axios";
+import { ref, onMounted } from "vue"
+import { useUsuarioStore } from "../stores/usuario.js"
+import {useImpuestoStore} from "../stores/impuesto.js"
+import {useProductoStore} from "../stores/producto.js"
+import { useQuasar } from "quasar";
+import { useRouter } from "vue-router";
+const ImpuestoStore = useImpuestoStore();
+const ProductoStore= useProductoStore();
+const UsuarioStore = useUsuarioStore();
+const $q = useQuasar();
+const router = useRouter();
+let rows = ref([]);
+let pagination = ref({ rowsPerPage: 0 })
+let usuarios = ref([]);
+
+async function obtenerInfo() {
+    try {
+        await UsuarioStore.obtenerusuario();
+        usuarios.value = UsuarioStore.usuario;
+        rows.value = UsuarioStore.usuarios.reverse();
+        console.log('llegan datos',UsuarioStore.usuarios);
+
+    } catch (error) {
+        console.log(error);
+    };
+};
+
+async function obtenerproducto() {
+    try {
+        // Llamada para obtener los productos desde el store
+        await ProductoStore.obtenerproductos();
+        // Verificar si el producto se obtuvo correctamente
+        if (!ProductoStore.productos || ProductoStore.productos.length === 0) {
+            console.log('Error: No se han obtenido productos o la respuesta es vacía.');
+            $q.notify({
+                type: 'negative',
+                message: 'Error: No se han obtenido productos.'
+            });
+            return; // Salir de la función si no hay productos
+        }
+
+        // Filtrar los productos con los campos que necesitas
+        const productosFiltrados = ProductoStore.productos.map((producto) => ({
+            nombre: producto.nombre,
+            identificacion: producto.identificacion,
+            // codigo_producto: producto.codigo_producto || 'Falta código',
+            // cantidad: producto.cantidad || 'Falta cantidad',
+            // valor_unitario: producto.valor_unitario || 'Falta valor',
+            // // codigo_impuesto_cargo: producto.impuesto_id?.codigo_impuesto_cargo || 'Falta código impuesto',
+            // // retencion: producto.impuesto_id?.retencion || 'Falta retención',
+            // // valor_retencion: producto.impuesto_id?.valor_retencion || 'Falta valor retención',
+            // // reteica: producto.impuesto_id?.reteica || 'Falta reteica',
+            // // valor_reteica: producto.impuesto_id?.valor_reteica || 'Falta valor reteica',
+            // // porcentaje_descuento: producto.porcentaje_descuento || 'Falta descuento',
+            // fecha_vencimiento: producto.fecha_vencimiento || 'Falta fecha vencimiento',
+            // fecha_elaboracion: producto.fecha_elaboracion || 'Falta fecha elaboración',
+        }));
+
+        // Asigna los productos filtrados a las filas de la tabla
+        rows.value = productosFiltrados;
+    } catch (error) {
+        console.log('Error al obtener los productos:', error);
+        $q.notify({
+            type: 'negative',
+            message: 'Error al obtener los productos'
+        });
+    }
+}
+obtenerproducto();
+
+
+const columns = [
+    { name: 'nombre', label: 'Nombre Contacto', sortable:true, align: 'left',},
+    { name: 'identificacion', label: 'Identificación', sortable:true, align: 'left', },
+    { name: 'codigo_producto', label: 'Código Producto	', field: (row) => {
+        return row.producto_id.codigo_producto ? row.producto_id.codigo_producto : 'Falta el nombre de este usuario '; // verificar si el nombre existe
+    }, sortable:true, align: 'left',},
+    { name: 'cantidad', label: 'Cantidad', field: (row) => {
+        return row.producto_id.cantidad? row.producto_id.cantidad : 'Falta el nombre de este usuario '; // verificar si el nombre existe
+    }, sortable:true, align: 'left', },
+    { name: 'valor_unitario', label: 'Valor Uni',  field: (row) => {
+        return row.producto_id.valor_unitario ? row.producto_id.valor_unitario  : 'Falta el nombre de este usuario '; // verificar si el nombre existe
+    }, sortable:true, align: 'left', }, 
+    { name: 'codigo_impuesto_cargo', label: 'Codigo impuesto cargo',  field: (row) => {
+        return row.impuesto_id.codigo_impuesto_cargo ? row.impuesto_id.codigo_impuesto_cargo : 'Falta el nombre de este usuario '; // verificar si el nombre existe
+    }, sortable:true, align: 'left', },
+    { name: 'retencion', label: 'Retención',  field: (row) => {
+        return row.impuesto_id.retencion ? row.impuesto_id.retencion : 'Falta el nombre de este usuario '; // verificar si el nombre existe
+    }, sortable:true, align: 'left', }, 
+    { name: 'valor_retencion', label: 'Valor Retención',  field: (row) => {
+        return row.impuesto_id.valor_retencion ? row.impuesto_id.valor_retencion : 'Falta el nombre de este usuario '; // verificar si el nombre existe
+    }, sortable:true, align: 'left', },
+    { name: 'reteica', label: 'Reteica',  field: (row) => {
+        return row.impuesto_id.reteica ? row.impuesto_id.reteica : 'Falta el nombre de este usuario '; // verificar si el nombre existe
+    }, sortable:true, align: 'left', },
+    { name: 'valor_reteica', label: 'Valor Reteica',  field: (row) => {
+        return row.impuesto_id.valor_reteica ? row.impuesto_id.valor_reteica : 'Falta el nombre de este usuario '; // verificar si el nombre existe
+    }, sortable:true, align: 'left', },
+    { name: 'porcentaje_descuento', label: 'Porcentaje Descuento',  field: (row) => {
+        return row.impuesto_id.porcentaje_descuento ? row.impuesto_id.porcentaje_descuento : 'Falta el nombre de este usuario '; // verificar si el nombre existe
+    }, sortable:true, align: 'left', },
+    { name: 'fecha_vencimiento', label: 'Fecha Vencimiento',  field: (row) => {
+        return row.producto_id.fecha_vencimiento ? row.producto_id.fecha_vencimiento : 'Falta el nombre de este usuario '; // verificar si el nombre existe
+    }, sortable:true, align: 'left', },
+    { name: 'fecha_elaboracion', label: 'Fecha Elaboración',  field: (row) => {
+        return row.producto_id.fecha_elaboracion ? row.producto_id.fecha_elaboracion : 'Falta el nombre de este usuario '; // verificar si el nombre existe
+    }, sortable:true, align: 'left', },
+    { name: 'iron', label: 'Anidar', sortable:true, align: 'left', },
+    {
+        name: "opciones",
+        label: "Opciones",
+        field: (row) => null,
+        sortable: false,
+        align: "center",
+    }
+
+];
+
+onMounted(async () => {
+    obtenerInfo();
+});
+
+</script>
+<!-- <script>
 export default {
     methods: {
         async printTicket() {
@@ -67,7 +205,6 @@ export default {
                 if (!response.ok) {
                     throw new Error(`HTTP error! Status: ${response.status}`);
                 }
-                const data = await response.json();
                 const nombre = data.nombre || "Nombre no disponible";
                 const cedula = data.cedula || "Cédula no disponible";
                 const dire = data.dire || "direccion no disponible";
@@ -130,14 +267,16 @@ export default {
         },
     },
 };
-</script>
+</script> -->
 
 <style scoped>
 .container {
-    margin: 0;
     height: 100vh;
+    width: 100%;
     display: flex;
     justify-content: center;
+    align-items: center;
+    /* Asegúrate de que el contenedor ocupe el 100% del ancho */
 }
 
 .titulo {
@@ -151,28 +290,172 @@ export default {
 .seleccionar {
     font-family: 'Lucida Sans', 'Lucida Sans Regular', 'Lucida Grande', 'Lucida Sans Unicode', Geneva, Verdana, sans-serif;
     font-style: bold;
-    font-size: 10px;
     display: flex;
     flex-direction: row;
     align-items: center;
+    height: 10%;
     gap: 5%;
 }
 
 .btn {
-    padding: 2%;
-    width: 100%;
-    /* Hacer que el botón ocupe el 100% del ancho */
-    box-sizing: border-box;
+    border: solid 2px black;
+    padding: 1%;
     /* Asegúrate de que el padding no afecte el ancho */
 }
 
 .botones {
     display: flex;
-    flex-direction: column;
-    /* Cambiar a columna para que los botones ocupen 100% */
+    flex-direction: row;
+    /* Cambia a columna si quieres que los botones estén en una columna */
     gap: 5%;
     /* Espacio entre botones */
     width: 100%;
     /* Asegúrate de que el contenedor ocupe el 100% */
+}
+
+.modal-content {
+    width: 480px;
+    height: 500px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: space-evenly;
+    background-color: #2aac4b;
+    border-radius: 3%;
+}
+
+.contorno {
+    background-color: white;
+    height: 95%;
+    width: 95%;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+}
+
+.botones button {
+    margin: 2px;
+}
+
+.btn-agregar {
+    width: 100%;
+    margin-bottom: 5px;
+    display: flex;
+    color: white;
+    /* margin-left: 19px; */
+    align-items: center;
+    flex-direction: row;
+    justify-content: space-around;
+}
+
+.body {
+    padding: 30px;
+    margin: 0;
+    text-transform: capitalize;
+}
+
+.containerBoton {
+    display: flex;
+    justify-content: center;
+}
+
+hr {
+    background-color: green;
+    height: 2px;
+    border: none;
+    width: 363px;
+    margin-bottom: 1%;
+}
+
+.containerError {
+    background-color: rgba(255, 0, 0, 0.429);
+    padding: 15px;
+    text-align: center;
+    font-family: "Letra";
+    font-weight: bold;
+    width: 310px;
+    border: 3px solid red;
+    margin-bottom: 5px;
+    height: 180px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    font-size: 80px;
+}
+
+.containerError h4 {
+    font-size: 25px;
+    margin: 0;
+    padding: 0;
+}
+
+h1 {
+    font-family: "Letra";
+    text-align: center;
+    margin: 0;
+    align-items: center;
+    margin-top: 2%;
+}
+
+.text-h6 {
+    font-size: 28px;
+    font-family: "Letra";
+    margin-bottom: 10px;
+}
+
+.botones .edi {
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+    padding: 7px;
+    background-color: transparent;
+}
+
+.botones .edi:hover {
+    transform: scale(1.05);
+    transition: all 0.5s;
+}
+
+.botones .act {
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+    padding: 7px;
+    background-color: transparent;
+}
+
+.act i {
+    font-size: 22px;
+    color: green;
+}
+
+.inac {
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+    padding: 5px;
+    margin: 0;
+    background-color: transparent;
+}
+
+.botones .edi i {
+    font-size: 20px;
+}
+
+.inac i {
+    font-size: 25px;
+    color: red;
+}
+
+.btn {
+    font-family: "Letra";
+    width: 100px;
+
+    border-radius: 5px;
+    border: none;
+
+    cursor: pointer;
+    background: -webkit-linear-gradient(bottom, #b95b5b, #d34646);
 }
 </style>
