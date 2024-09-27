@@ -5,14 +5,14 @@
             <div>Subir Archivo CSV:</div>
             <div>
                 <div class="seleccionar">
-                    <button @click="subir()" class="btn"
-                        style="background-color: #007BFF; font-weight: bold; color: white; width: 25%; height: 30%;">Seleccionar
-                        el archivo</button>
-                    <div>Ningún archivo Seleccionado</div>
+                    <input type="file" accept=".csv" @change="procesarArchivo" style="display: none;" ref="fileInput">
+                    <button @click="abrirSeleccionArchivo()" class="btn"
+                        style="background-color: #007BFF; font-weight: bold; color: white; width: 25%; height: 30%;">
+                        Seleccionar el archivo
+                    </button>
+                    <div v-if="nombreArchivo">{{ nombreArchivo }}</div>
+                    <div v-else>Ningún archivo Seleccionado</div>
                 </div>
-            </div>
-            <div>
-                <button @click="printTicket" style="width: 14%; height: 10%; padding: 1%;">Imprimir Ticket</button>
             </div>
 
             <!-- Tabla -->
@@ -44,8 +44,8 @@
                         <template v-slot:body-cell-opciones="props">
                             <q-td :props="props" class="botones">
                                 <button @click="imprimirticket(props.row)" class="edi">
-                                <i class="fa-solid fa-print"></i>
-                            </button>
+                                    <i class="fa-solid fa-print"></i>
+                                </button>
                             </q-td>
                         </template>
                     </q-table>
@@ -56,11 +56,19 @@
 </template>
 
 <script setup>
+import { jsPDF } from "jspdf";
 import axios from "axios";
 import { ref, onMounted } from "vue"
 import { useUsuarioStore } from "../stores/usuario.js"
 import { useQuasar } from "quasar";
 import { useRouter } from "vue-router";
+import fondo from "../assets/fondo.png"
+import logo from "../assets/logo.png"
+import cufe from "../assets/cufe.png"
+import cliente from "../assets/cliente.png"
+import pedido from "../assets/tabla-de-pedido.png"
+import escanear from "../assets/escanear.png"
+
 
 const UsuarioStore = useUsuarioStore();
 const $q = useQuasar();
@@ -69,12 +77,28 @@ let rows = ref([]);
 let pagination = ref({ rowsPerPage: 0 })
 let usuarios = ref([]);
 
+
+let nombreArchivo = ref("");
+
+function abrirSeleccionArchivo() {
+    const fileInput = document.querySelector('input[type="file"]');
+    fileInput.click();
+}
+
+function procesarArchivo(event) {
+    const archivo = event.target.files[0];
+    if (archivo) {
+        nombreArchivo.value = archivo.name;
+    }
+}
+
+
 async function obtenerInfo() {
     try {
         await UsuarioStore.obtenerusuario();
         usuarios.value = UsuarioStore.usuario;
         rows.value = UsuarioStore.usuarios.reverse();
-        console.log('llegan datos',UsuarioStore.usuarios);
+        console.log('llegan datos', UsuarioStore.usuarios);
 
     } catch (error) {
         console.log(error);
@@ -82,39 +106,62 @@ async function obtenerInfo() {
 };
 
 const columns = [
-    { name: 'nombre', label: 'Nombre Contacto', field: "nombre",sortable:true, align: 'left',},
-    { name: 'identificacion', label: 'Identificación', field: "identificacion", sortable:true, align: 'left', },
-    { name: 'codigo_producto', label: 'Código Producto	', field: (row) => {
-        return row.idProducto.codigo_producto ? row.idProducto.codigo_producto : 'Falta el nombre de este usuario '; // verificar si el nombre existe
-    }, sortable:true, align: 'left',},
-    { name: 'valor_unitario', label: 'Valor Uni',  field: (row) => {
-        return row.idProducto.valor_unitario ? row.idProducto.valor_unitario  : 'Falta el nombre de este usuario '; // verificar si el nombre existe
-    }, sortable:true, align: 'left', }, 
-    { name: 'codigo_impuesto_cargo', label: 'Codigo impuesto cargo',  field: (row) => {
-        return row.idImpuesto.codigo_impuesto_cargo ? row.idImpuesto.codigo_impuesto_cargo : 'Falta el nombre de este usuario '; // verificar si el nombre existe
-    }, sortable:true, align: 'left', },
-    { name: 'retencion', label: 'Retención',  field: (row) => {
-        return row.idImpuesto.retencion ? row.idImpuesto.retencion : 'Falta el nombre de este usuario '; // verificar si el nombre existe
-    }, sortable:true, align: 'left', }, 
-    { name: 'valor_retencion', label: 'Valor Retención',  field: (row) => {
-        return row.idImpuesto.valor_retencion ? row.idImpuesto.valor_retencion : 'Falta el nombre de este usuario '; // verificar si el nombre existe
-    }, sortable:true, align: 'left', },
-    { name: 'reteica', label: 'Reteica',  field: (row) => {
-        return row.idImpuesto.reteica ? row.idImpuesto.reteica : 'Falta el nombre de este usuario '; // verificar si el nombre existe
-    }, sortable:true, align: 'left', },
-    { name: 'valor_reteica', label: 'Valor Reteica',  field: (row) => {
-        return row.idImpuesto.valor_reteica ? row.idImpuesto.valor_reteica : 'Falta el nombre de este usuario '; // verificar si el nombre existe
-    }, sortable:true, align: 'left', },
-    { name: 'porcentaje_descuento', label: 'Porcentaje Descuento',  field: (row) => {
-        return row.idImpuesto.porcentaje_descuento ? row.idImpuesto.porcentaje_descuento : 'Falta el nombre de este usuario '; // verificar si el nombre existe
-    }, sortable:true, align: 'left', },
-    { name: 'fecha_vencimiento', label: 'Fecha Vencimiento',  field: (row) => {
-        return row.idProducto.fecha_vencimiento ? row.idProducto.fecha_vencimiento : 'Falta el nombre de este usuario '; // verificar si el nombre existe
-    }, sortable:true, align: 'left', },
-    { name: 'fecha_elaboracion', label: 'Fecha Elaboración',  field: (row) => {
-        return row.idProducto.fecha_elaboracion ? row.idProducto.fecha_elaboracion : 'Falta el nombre de este usuario '; // verificar si el nombre existe
-    }, sortable:true, align: 'left', },
-    { name: 'iron', label: 'Anidar', sortable:true, align: 'left', },
+    { name: 'nombre', label: 'Nombre Contacto', field: "nombre", sortable: true, align: 'left', },
+    { name: 'identificacion', label: 'Identificación', field: "identificacion", sortable: true, align: 'left', },
+    { name: 'correo', label: 'Correo', field: "correo", sortable: true, align: 'left', },
+    { name: 'direccion', label: 'Dirección Contacto', field: "direccion", sortable: true, align: 'left', },
+    { name: 'telefono', label: 'Telefono', field: "telefono", sortable: true, align: 'left', },
+    {
+        name: 'codigo_producto', label: 'Código Producto	', field: (row) => {
+            return row.idProducto.codigo_producto ? row.idProducto.codigo_producto : 'Falta el nombre de este usuario '; // verificar si el nombre existe
+        }, sortable: true, align: 'left',
+    },
+    {
+        name: 'valor_unitario', label: 'Valor Uni', field: (row) => {
+            return row.idProducto.valor_unitario ? row.idProducto.valor_unitario : 'Falta el nombre de este usuario '; // verificar si el nombre existe
+        }, sortable: true, align: 'left',
+    },
+    {
+        name: 'codigo_impuesto_cargo', label: 'Codigo impuesto cargo', field: (row) => {
+            return row.idImpuesto.codigo_impuesto_cargo ? row.idImpuesto.codigo_impuesto_cargo : 'Falta el nombre de este usuario '; // verificar si el nombre existe
+        }, sortable: true, align: 'left',
+    },
+    {
+        name: 'retencion', label: 'Retención', field: (row) => {
+            return row.idImpuesto.retencion ? row.idImpuesto.retencion : 'Falta el nombre de este usuario '; // verificar si el nombre existe
+        }, sortable: true, align: 'left',
+    },
+    {
+        name: 'valor_retencion', label: 'Valor Retención', field: (row) => {
+            return row.idImpuesto.valor_retencion ? row.idImpuesto.valor_retencion : 'Falta el nombre de este usuario '; // verificar si el nombre existe
+        }, sortable: true, align: 'left',
+    },
+    {
+        name: 'reteica', label: 'Reteica', field: (row) => {
+            return row.idImpuesto.reteica ? row.idImpuesto.reteica : 'Falta el nombre de este usuario '; // verificar si el nombre existe
+        }, sortable: true, align: 'left',
+    },
+    {
+        name: 'valor_reteica', label: 'Valor Reteica', field: (row) => {
+            return row.idImpuesto.valor_reteica ? row.idImpuesto.valor_reteica : 'Falta el nombre de este usuario '; // verificar si el nombre existe
+        }, sortable: true, align: 'left',
+    },
+    {
+        name: 'porcentaje_descuento', label: 'Porcentaje Descuento', field: (row) => {
+            return row.idImpuesto.porcentaje_descuento ? row.idImpuesto.porcentaje_descuento : 'Falta el nombre de este usuario '; // verificar si el nombre existe
+        }, sortable: true, align: 'left',
+    },
+    {
+        name: 'fecha_vencimiento', label: 'Fecha Vencimiento', field: (row) => {
+            return row.idProducto.fecha_vencimiento ? row.idProducto.fecha_vencimiento : 'Falta el nombre de este usuario '; // verificar si el nombre existe
+        }, sortable: true, align: 'left',
+    },
+    {
+        name: 'fecha_elaboracion', label: 'Fecha Elaboración', field: (row) => {
+            return row.idProducto.fecha_elaboracion ? row.idProducto.fecha_elaboracion : 'Falta el nombre de este usuario '; // verificar si el nombre existe
+        }, sortable: true, align: 'left',
+    },
+    { name: 'iron', label: 'Anidar', sortable: true, align: 'left', },
     {
         name: "opciones",
         label: "Opciones",
@@ -124,99 +171,289 @@ const columns = [
     }
 
 ];
- 
+
 onMounted(async () => {
-    obtenerInfo();
+    obtenerInfo(async () => {
+        obtenerInfo();
+    });
 });
 
-</script>
- <script>
- 
-export default {
-    methods: {
-        async imprimirticket() {
-            const doc = new jsPDF({
-                orientation: "portrait",
-                unit: "mm",
-                format: [140, 216],
-            });
+async function imprimirticket(factura) {
+    const doc = new jsPDF({
+        orientation: "portrait",
+        unit: "mm",
+        format: [140, 216],
+    })
 
-            try {
-                const response = await fetch("data.json");
-                if (!response.ok) {
-                    throw new Error(`HTTP error! Status: ${response.status}`);
-                }
-                const nombre = data.nombre || "Nombre no disponible";
-                const cedula = data.cedula || "Cédula no disponible";
-                const dire = data.dire || "direccion no disponible";
-                const correo = data.correo || "correo no disponible";
-                const telefono = data.telefono || "telefono no disponible";
-                const descripcion = data.Descripcion || "descripcion no disponible";
-                const cantidad = parseFloat(data.cantidad) || 0;
-                const precio = parseFloat(data.precio) || 0;
-                const iva = parseFloat(data.iva) || 0;
-                const ret = parseFloat(data.ret) || 0;
-                const rte_ica = parseFloat(data.rte_ica) || 0;
-                const subtotal = parseFloat(data.subtotal) || 0;
-                const mes = data.mes || "direccion no disponible";
-                const total = (cantidad * precio + iva - ret - rte_ica).toLocaleString('es-CO', { minimumFractionDigits: 0 });
-                const precioFormateado = precio.toLocaleString('es-CO', { minimumFractionDigits: 0 });
-                const ivaFormateado = iva.toLocaleString('es-CO', { minimumFractionDigits: 0 });
-                const retFormateado = ret.toLocaleString('es-CO', { minimumFractionDigits: 0 });
-                const rteIcaFormateado = rte_ica.toLocaleString('es-CO', { minimumFractionDigits: 0 });
+    // Dimensiones y colores
+    const headerHeight = 18;
+    const headerWidth = 136;
+    const pageWidth = 140;
+    const pageHeight = 216;
+    const cornerRadius = 5;
 
-                // Dimensiones y colores
-                const headerHeight = 18;
-                const headerWidth = 136;
-                const pageWidth = 140;
-                const pageHeight = 216;
 
-                // Añadir la plantilla como fondo
-                const imgFile3 = "fondo.png";
-                const imgData3 = await this.loadImageAsBase64(imgFile3);
-                doc.addImage(imgData3, "PNG", 0, 0, pageWidth, pageHeight);
+    // Añadir las plantillas
+    doc.addImage(fondo, "PNG", 0, 0, pageWidth, pageHeight);
+    doc.addImage(logo, "PNG", 2, 1, 50, 25);
+    doc.addImage(cliente, "PNG", 1, 60, 138, 24);
+    doc.addImage(pedido, "PNG", 1, 104, 136, 56);
+    doc.addImage(escanear, "PNG", -1, 162, 142, 32);
+    // Añadir otras imágenes
+    //   const imgFile4 = "logo.png";
+    // //   const imgData4 = await (imgFile4);
+    //   
 
-                // Añadir otras imágenes
-                const imgFile4 = "logo.png";
-                const imgData4 = await this.loadImageAsBase64(imgFile4);
-                doc.addImage(imgData4, "JPEG", 2, 1, 50, 25);
+    // Título "FACTURA ELECTRÓNICA" en negrita
+    const title3 = "FACTURA ELECTRÓNICA";
+    const titleFontSize3 = 10;
+    doc.setFont("Helvetica", "bold");
+    doc.setFontSize(titleFontSize3);
+    doc.setTextColor(0, 0, 0);
 
-                // Resto del código de generación de PDF...
-                // Aquí puedes incluir todo el código que sigue en tu script original
+    const title3Width =
+        (doc.getStringUnitWidth(title3) * titleFontSize3) /
+        doc.internal.scaleFactor;
+    const title3X = headerWidth - title3Width - 2;
+    const title3Y = headerHeight / 2 + titleFontSize3 / 2 - 7;
 
-                // Mostrar el PDF
-                const pdfBlob = doc.output("blob");
-                const pdfUrl = URL.createObjectURL(pdfBlob);
-                window.open(pdfUrl, "_blank");
-            } catch (error) {
-                console.error("Error al cargar el archivo JSON o las imágenes:", error);
+    doc.text(title3, title3X, title3Y);
+
+    // Añadir la imagen PQR CUFE
+    const pqrX = 65; // Posición horizontal (ajusta según sea necesario)
+    const pqrY = 3; // 2 cm desde la parte superior
+    const pqrWidth = 18; // Ancho de la imagen
+    const pqrHeight = 16; // Altura de la imagen
+    doc.addImage(cufe, "JPEG", pqrX, pqrY, pqrWidth, pqrHeight);
+
+    // Texto "CUFE:" en negrita, centrado debajo de la imagen PQR
+    const cufeTitle = "CUFE:";
+    const cufeFontSize = 12;
+    doc.setFont("Helvetica", "bold");
+    doc.setFontSize(cufeFontSize);
+    const cufeWidth =
+        (doc.getStringUnitWidth(cufeTitle) * cufeFontSize) /
+        doc.internal.scaleFactor;
+    const cufeTitleX = pqrX + (pqrWidth - cufeWidth) / 2;
+    const cufeTitleY = pqrY + pqrHeight + 5; // Ajustar la distancia debajo de la imagen PQR
+    doc.text(cufeTitle, cufeTitleX, cufeTitleY);
+
+    // Dibujar una barra de progreso de 3 puntos en la mitad de la hoja
+    const progressBarY = pageHeight / 6; // Centrado verticalmente
+    const progressBarXStart = (pageWidth - 90) / 2; // Ajustar para centrar horizontalmente
+    const circleRadius = 2.5;
+    const circleSpacing = 45; // distancia
+    doc.setDrawColor(226, 48, 9); // Color del borde de los círculos
+    doc.setFillColor(255, 255, 255); // Color de relleno de los círculos (blanco)
+
+    for (let i = 0; i < 3; i++) {
+        const circleX = progressBarXStart + i * circleSpacing;
+        doc.circle(circleX, progressBarY, circleRadius, "FD"); // 'FD' para borde y relleno
+        if (i < 2) {
+            const nextCircleX = circleX + circleSpacing;
+            doc.setLineWidth(0.5); // Reducir el grosor de la línea
+            doc.line(
+                circleX + circleRadius + 0.5,
+                progressBarY,
+                nextCircleX - circleRadius - 0.5,
+                progressBarY
+            ); // Ajustar para evitar superposición
+        }
+    }
+
+    // Añadir las fechas sobre los puntos
+    const fechas = ["25/08", "30/08", "05/09"];
+    const fechaFontSize = 8;
+    doc.setFont("Helvetica", "bold");
+    doc.setFontSize(fechaFontSize);
+    for (let i = 0; i < fechas.length; i++) {
+        const fechaX = progressBarXStart + i * circleSpacing;
+        const fechaY = progressBarY - 5; // Ajustar la posición vertical para colocar el texto sobre los puntos
+        doc.text(
+            fechas[i],
+            fechaX -
+            (doc.getStringUnitWidth(fechas[i]) * fechaFontSize) /
+            (2 * doc.internal.scaleFactor),
+            fechaY
+        );
+    }
+
+    // Añadir el contenido de tiempo debajo de los puntos
+    const tiempo = [
+        "Inicio de período",
+        "Fecha de suspensión",
+        "Fin de período",
+    ];
+    const tiempoFontSize = 8;
+    doc.setFont("Helvetica", "bold");
+    doc.setFontSize(tiempoFontSize);
+    for (let i = 0; i < tiempo.length; i++) {
+        const tiempoX = progressBarXStart + i * circleSpacing;
+        const tiempoY = progressBarY + 7; // Ajustar la posición vertical para colocar el texto debajo de los puntos
+        doc.text(
+            tiempo[i],
+            tiempoX -
+            (doc.getStringUnitWidth(tiempo[i]) * tiempoFontSize) /
+            (2 * doc.internal.scaleFactor),
+            tiempoY
+        );
+    }
+
+    // Cuadro que ocupa todo el ancho con el texto "Hola Mundo" centrado
+    const cuadroX = 0;
+    const cuadroYy = progressBarY + 10;
+    const cuadroWidtht = pageWidth;
+    const cuadroHeightt = 10;
+
+    doc.setDrawColor(0, 0, 0); // Color del borde
+    doc.setFillColor(255, 255, 255); // Color de relleno
+    doc.rect(cuadroX, cuadroYy, cuadroWidtht, cuadroHeightt, "FD"); // Dibuja el cuadro
+
+    // Texto "DETALLE DEL CLIENTE" centrado dentro del cuadro
+    const holaMundo = "DETALLE DEL CLIENTE";
+    const holaFontSize = 15;
+    doc.setFont("Helvetica", "bold");
+    doc.setFontSize(holaFontSize);
+    const holaWidth =
+        (doc.getStringUnitWidth(holaMundo) * holaFontSize) /
+        doc.internal.scaleFactor;
+    const holaX = (pageWidth - holaWidth) / 2;
+    const holaY = cuadroYy + cuadroHeightt / 5 + holaFontSize / 3; // Centrar verticalmente el texto
+    doc.text(holaMundo, holaX, holaY);
+
+    // Cuadro que ocupa todo el ancho con el texto centrado
+    const cuadrox = 0;
+    const cuadroy = progressBarY + 55;
+    const cuadrowidtht = pageWidth;
+    const cuadroheightt = 10;
+    doc.setDrawColor(0, 0, 0); // Color del borde
+    doc.setFillColor(255, 255, 255); // Color de relleno
+    doc.rect(cuadrox, cuadroy, cuadrowidtht, cuadroheightt, "FD"); // Dibuja el cuadro
+
+    // Texto "DETALLE DE LA COMPRA" centrado dentro del cuadro
+    const compra = "DETALLE DE LA COMPRA";
+    const compraFontSize = 15;
+    doc.setFont("Helvetica", "bold");
+    doc.setFontSize(compraFontSize);
+    const compraWidth =
+        (doc.getStringUnitWidth(compra) * compraFontSize) /
+        doc.internal.scaleFactor;
+    const compraX = (pageWidth - compraWidth) / 2;
+    const compraY = cuadroYy + cuadroHeightt + 42; // Centrar verticalmente el texto
+    doc.text(compra, compraX, compraY);
+
+    // Dimensiones y posición del cuadro
+    const cuadroY = pageHeight - 20.3; // Posición vertical del cuadro (ajustar según sea necesario)
+    const cuadroHeight = 20; // Altura del cuadro
+    const cuadroWidth = pageWidth; // Ancho del cuadro
+    const cellHeightt = cuadroHeight / 2; // Altura de cada fila
+    const cellWidtht = cuadroWidth / 2; // Ancho de cada columna
+
+    // Dibujar el cuadro
+    doc.setDrawColor(0, 0, 0); // Color del borde
+    doc.setFillColor(255, 255, 255); // Color de relleno
+    doc.rect(0, cuadroY, cuadroWidth, cuadroHeight, "FD"); // Dibuja el cuadro con borde y relleno
+
+    // Textos para cada celda (2 filas y 2 columnas)
+    const texto = [
+        ["NOMBRE:", "VALOR TOTAL:"],
+        ["CEDULA:", "MES:"],
+    ];
+
+    for (let i = 0; i < texto.length; i++) {
+        for (let j = 0; j < texto[i].length; j++) {
+            const text = texto[i][j];
+            const textFontSize = 9;
+            doc.setFont("Helvetica", "bold");
+            doc.setFontSize(textFontSize);
+
+            // Posicionar el texto en cada celda
+            const textY =
+                cuadroY + i * cellHeightt + cellHeightt / 10 + textFontSize / 2;
+            let textX;
+
+            // Alinear texto a la izquierda
+            textX = j * cellWidtht + 2; // Ajuste de margen izquierdo
+
+            doc.text(text, textX, textY);
+
+            // Dibujar las líneas de división horizontal y vertical
+            if (i < texto.length - 1) {
+                doc.line(
+                    0,
+                    cuadroY + cellHeightt * (i + 1),
+                    cuadroWidth,
+                    cuadroY + cellHeightt * (i + 1)
+                ); // Línea horizontal
             }
-        },
+            if (j < texto[i].length - 1) {
+                doc.line(
+                    cellWidtht * (j + 1),
+                    cuadroY,
+                    cellWidtht * (j + 1),
+                    cuadroY + cuadroHeight
+                ); // Línea vertical
+            }
+        }
+    };
 
-        loadImageAsBase64(fileName) {
-            return new Promise((resolve, reject) => {
-                const reader = new FileReader();
-                reader.onloadend = () => {
-                    resolve(reader.result);
-                };
-                reader.onerror = reject;
+    // Texto "OBSERVACIONES" centrado dentro del cuadro
+    const observaciones = "OBSERVACIONES";
+    const observacionfontzise = 10;
+    doc.setFont("Helvetica", "bold");
+    doc.setFontSize(observacionfontzise);
+    const observacionWidth =
+        (doc.getStringUnitWidth(observaciones) * observacionfontzise) /
+        doc.internal.scaleFactor;
+    let observacionx = (pageWidth - observacionWidth) / 2;
+    let observaciony =
+        cuadroYy + cuadroHeightt / 1 + observacionfontzise / 3; // Centrar verticalmente el texto
+    observacionx -= 52; // Mover 10 unidades a la izquierda
+    observaciony += 77; // Mover 20 unidades hacia abajo
+    doc.text(observaciones, observacionx, observaciony);
 
-                fetch(fileName)
-                    .then((response) => response.blob())
-                    .then((blob) => reader.readAsDataURL(blob));
-            });
-        },
-    },
-};
+    // Añadir los datos
+    doc.setFont("Helvetica", "normal");
+    doc.setFontSize(8);
+    const offsetX = 90; // Ajustar el inicio del texto a la derecha
+    const offsetY = cuadroYy + 14; // Ajustar el inicio del texto
+
+    doc.text(` ${factura.nombre}`, offsetX - 60, offsetY + 5);
+    doc.text(` ${factura.identificacion}`, offsetX - 55, offsetY + 13);
+    doc.text(` ${factura.direccion}`, offsetX + 15, offsetY + 13);
+    doc.text(` ${factura.correo}`, offsetX - 65, offsetY + 21);
+    doc.text(` ${factura.telefono}`, offsetX + 15, offsetY + 21);
+    doc.text(` ${factura.idProducto.descripcion}`, offsetX - 80, offsetY + 53);
+    doc.text(` ${factura.idProducto.cantidad}`, offsetX - 43, offsetY + 53);
+    doc.text(` ${factura.idProducto.valor_unitario}`, offsetX - 29, offsetY + 53);
+    doc.text(` ${factura.idImpuesto.valor_retencion}`, offsetX - 15, offsetY + 53);
+    doc.text(` ${factura.idImpuesto.retencion}`, offsetX - 4.5, offsetY + 53);
+    doc.text(` ${factura.idImpuesto.valor_reteica}`, offsetX + 10, offsetY + 53);
+    doc.text(` 119.000`, offsetX + 29, offsetY + 53) //total
+    doc.text(` 119.000`, offsetX + 29, offsetY + 97) //total inferior 
+    doc.text(` ${factura.idImpuesto.valor_retencion}`, offsetX + 30, offsetY + 80); //
+    doc.text(` ${factura.idImpuesto.retencion}`, offsetX + 30, offsetY + 86); //
+    doc.text(` ${factura.idImpuesto.valor_reteica}`, offsetX + 30, offsetY + 92); //
+    //   doc.text(` ${total}`, offsetX + 32, offsetY + 99 , ); // total= (cantidad*precio) + iva - rte- rte_ica
+    //   doc.text(` ${total}`, offsetX + 20, offsetY + 140.5); // tirilla
+    doc.text(` 119.000`, offsetX + 15, offsetY + 142); //tirilla
+    doc.text(` ${factura.nombre}`, offsetX - 70, offsetY + 142); // tirilla
+    doc.text(` ${factura.identificacion}`, offsetX - 70, offsetY + 152); // tirilla
+    doc.text(` 27/09/2024`, offsetX + 15, offsetY + 152); // tirilla
+
+    const pdfBlob = doc.output('blob');
+    const pdfUrl = URL.createObjectURL(pdfBlob);
+    window.open(pdfUrl, '_blank');
+}
+
 </script>
 
 <style scoped>
 .container {
     height: 100vh;
-    width: 100%;
     display: flex;
     justify-content: center;
-    align-items: center;
+    padding: 8%;
     /* Asegúrate de que el contenedor ocupe el 100% del ancho */
 }
 
@@ -236,6 +473,7 @@ export default {
     align-items: center;
     height: 10%;
     gap: 5%;
+    padding-bottom: 4%;
 }
 
 .btn {
