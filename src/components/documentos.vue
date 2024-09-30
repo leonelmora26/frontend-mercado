@@ -18,19 +18,20 @@
             <!-- Tabla -->
             <div style="width: 90vw;">
                 <div class="btn-agregar">
-                    <button @click="subir()" class="btn" style="color: white; width: 18%;">Enviar Facturas Anidadas a
-                        Alegra</button>
-                    <button @click="subir()" class="btn" style="color: white; width: 18%;">Enviar Facturas simples a
-                        Alegra</button>
-                    <button @click="subir()" class="btn" style="color: white; width: 18%;">Procesar Datos</button>
-                    <button @click="subir()" class="btn" style="color: white; width: 18%;">Limpiar Base de
+                    <button @click="enviarfacturasanidadas()" class="btn" style="color: white; width: 18%;">Enviar
+                        Facturas Anidadas a Alegra</button>
+                    <button @click="enivarfacturassimples()" class="btn" style="color: white; width: 18%;">Enviar
+                        Facturas simples a Alegra</button>
+                    <button @click="procesardatos()" class="btn" style="color: white; width: 18%;">Procesar
+                        Datos</button>
+                    <button @click="lmpiarbasededatos()" class="btn" style="color: white; width: 18%;">Limpiar Base de
                         Datos</button>
                     <button @click="subir()" class="btn" style="color: white; width: 18%;">Subir</button>
                 </div>
 
                 <div class="q-pa-md">
                     <q-table class="my-sticky-virtscroll-table" virtual-scroll flat bordered
-                        v-model:pagination="pagination" :rows-per-page-options="[0]"
+                        v-model:pagination="pagination" :rows-per-page-options="[10, 30, 50]"
                         :virtual-scroll-sticky-size-start="48" row-key="name" :rows="rows" :columns="columns">
                         <!-- Columna para el estado -->
                         <template v-slot:body-cell-estado="props">
@@ -55,6 +56,7 @@
     </div>
 </template>
 
+
 <script setup>
 import { jsPDF } from "jspdf";
 import axios from "axios";
@@ -74,8 +76,10 @@ const UsuarioStore = useUsuarioStore();
 const $q = useQuasar();
 const router = useRouter();
 let rows = ref([]);
-let pagination = ref({ rowsPerPage: 0 })
-let usuarios = ref([]);
+let pagination = ref({
+  page: 1,
+  rowsPerPage: 10, // Número de filas por página
+});let usuarios = ref([]);
 
 
 let nombreArchivo = ref("");
@@ -90,6 +94,44 @@ function procesarArchivo(event) {
     if (archivo) {
         nombreArchivo.value = archivo.name;
     }
+}
+
+
+async function subir() {
+    const archivo = ref('input[type="file"]').files[0];
+    if (!archivo) {
+        alert("Por favor, selecciona un archivo CSV primero.");
+        return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+        const contenido = e.target.result;
+        const lineas = contenido.split("\n").slice(0).slice(); // Ignorar el encabezado
+        datosCSV.value= filas.map(fila => fila.split(','));
+        const datos = lineas.map(linea => {
+            const columns = linea.split(";").map(col => col.trim()); // Separar por ';' y eliminar espacios
+            return {
+                nombre: columns[0] || '', // Nombre contacto
+                identificacion: columns[1] || '', // Identificación
+                codigo_producto: columns[2] || '', // Código producto
+                cantidadProducto: columns[""] || '', // Cantidad producto
+                valor_unitario: columns[""] || '', // Valor unitario
+                codigoImpuestoCargo: columns[""] || '', // Código impuesto cargo
+                retencion: columns[""] || '', // Retención
+                valorRetencion: columns[""] || '', // Valor Retención
+                reteica: columns[""] || '', // Reteica
+                valorReteica: columns[""] || '', // Valor Reteica
+                porcentajeDescuento: columns[""] || '', // Porcentaje Descuento
+                fecha_vencimiento: columns[11] || '', // Fecha Vencimiento
+                fecha_elaboracion: columns[12] || '', // Fecha de elaboración
+                anidar: columns[13] || '', // Anidar
+            };
+        });
+        // Asignar a 'rows'
+        rows.value = datos;
+    };
+    reader.readAsText(archivo);
 }
 
 
@@ -113,55 +155,35 @@ const columns = [
     { name: 'telefono', label: 'Telefono', field: "telefono", sortable: true, align: 'left', },
     {
         name: 'codigo_producto', label: 'Código Producto	', field: (row) => {
-            return row.idProducto.codigo_producto ? row.idProducto.codigo_producto : 'Falta el nombre de este usuario '; // verificar si el nombre existe
+            return row && row.codigo_producto ? row.codigo_producto : 'N/A';
         }, sortable: true, align: 'left',
+    },
+    // {/ name: 'valor_unitario', / label: 'Valor Uni', / field: (row) => {/ return row?.idProducto?.valor_unitario ?? 0; // devuelve 0 si no existe/ }, / sortable: true, / align: 'left',// },// {/ name: 'codigo_impuesto_cargo', / label: 'Codigo impuesto cargo', / field: (row) => {/ return row?.idImpuesto?.codigo_impuesto_cargo ?? 0; // devuelve 0 si no existe/ }, / sortable: true, / align: 'left',// },// {/ name: 'retencion', / label: 'Retención', / field: (row) => {/ return row?.idImpuesto?.retencion ?? 0; // devuelve 0 si no existe/ }, / sortable: true, / align: 'left',// },// {/ name: 'valor_retencion', / label: 'Valor Retención', / field: (row) => {/ return row?.idImpuesto?.valor_retencion ?? 0; // devuelve 0 si no existe/ }, / sortable: true, / align: 'left',// },// {/ name: 'reteica', / label: 'Reteica', / field: (row) => {/ return row?.idImpuesto?.reteica ?? 0; // devuelve 0 si no existe/ }, / sortable: true, / align: 'left',// },// {/ name: 'valor_reteica', / label: 'Valor Reteica', / field: (row) => {/ return row?.idImpuesto?.valor_reteica ?? 0; // devuelve 0 si no existe/ }, / sortable: true, / align: 'left',// },// {/ name: 'porcentaje_descuento', / label: 'Porcentaje Descuento', / field: (row) => {/ return row?.idImpuesto?.porcentaje_descuento ?? 0; // devuelve 0 si no existe/ }, / sortable: true, / align: 'left',// }
+    ,{
+        name: 'fecha_vencimiento',
+        label: 'Fecha Vencimiento',
+        field: (row) => {
+            return row?.fecha_vencimiento ?? '';
+        },
+        sortable: true,
+        align: 'left',
     },
     {
-        name: 'valor_unitario', label: 'Valor Uni', field: (row) => {
-            return row.idProducto.valor_unitario ? row.idProducto.valor_unitario : 'Falta el nombre de este usuario '; // verificar si el nombre existe
-        }, sortable: true, align: 'left',
+        name: 'fecha_elaboracion',
+        label: 'Fecha Elaboración',
+        field: (row) => {
+            return row?.fecha_elaboracion ?? '';
+        },
+        sortable: true,
+        align: 'left',
     },
-    {
-        name: 'codigo_impuesto_cargo', label: 'Codigo impuesto cargo', field: (row) => {
-            return row.idImpuesto.codigo_impuesto_cargo ? row.idImpuesto.codigo_impuesto_cargo : 'Falta el nombre de este usuario '; // verificar si el nombre existe
-        }, sortable: true, align: 'left',
+
+        { name: 'iron', label: 'Anidar',
+        field: (row) =>{
+            return row?.anidar ?? ''
+        },
+         sortable: true, align: 'left', 
     },
-    {
-        name: 'retencion', label: 'Retención', field: (row) => {
-            return row.idImpuesto.retencion ? row.idImpuesto.retencion : 'Falta el nombre de este usuario '; // verificar si el nombre existe
-        }, sortable: true, align: 'left',
-    },
-    {
-        name: 'valor_retencion', label: 'Valor Retención', field: (row) => {
-            return row.idImpuesto.valor_retencion ? row.idImpuesto.valor_retencion : 'Falta el nombre de este usuario '; // verificar si el nombre existe
-        }, sortable: true, align: 'left',
-    },
-    {
-        name: 'reteica', label: 'Reteica', field: (row) => {
-            return row.idImpuesto.reteica ? row.idImpuesto.reteica : 'Falta el nombre de este usuario '; // verificar si el nombre existe
-        }, sortable: true, align: 'left',
-    },
-    {
-        name: 'valor_reteica', label: 'Valor Reteica', field: (row) => {
-            return row.idImpuesto.valor_reteica ? row.idImpuesto.valor_reteica : 'Falta el nombre de este usuario '; // verificar si el nombre existe
-        }, sortable: true, align: 'left',
-    },
-    {
-        name: 'porcentaje_descuento', label: 'Porcentaje Descuento', field: (row) => {
-            return row.idImpuesto.porcentaje_descuento ? row.idImpuesto.porcentaje_descuento : 'Falta el nombre de este usuario '; // verificar si el nombre existe
-        }, sortable: true, align: 'left',
-    },
-    {
-        name: 'fecha_vencimiento', label: 'Fecha Vencimiento', field: (row) => {
-            return row.idProducto.fecha_vencimiento ? row.idProducto.fecha_vencimiento : 'Falta el nombre de este usuario '; // verificar si el nombre existe
-        }, sortable: true, align: 'left',
-    },
-    {
-        name: 'fecha_elaboracion', label: 'Fecha Elaboración', field: (row) => {
-            return row.idProducto.fecha_elaboracion ? row.idProducto.fecha_elaboracion : 'Falta el nombre de este usuario '; // verificar si el nombre existe
-        }, sortable: true, align: 'left',
-    },
-    { name: 'iron', label: 'Anidar', sortable: true, align: 'left', },
     {
         name: "opciones",
         label: "Opciones",
@@ -169,7 +191,6 @@ const columns = [
         sortable: false,
         align: "center",
     }
-
 ];
 
 onMounted(async () => {
@@ -179,6 +200,16 @@ onMounted(async () => {
 });
 
 async function imprimirticket(factura) {
+    if (!factura || !factura.descripcion) {
+        console.error("Factura or descripcion is undefined");
+        $q.notify({
+            color: "negative",
+            position: "top",
+            message: "No se puede imprimir, la factura es inválida o no tiene descripción",
+            icon: "warning"
+        });
+        return;
+    }
     const doc = new jsPDF({
         orientation: "portrait",
         unit: "mm",
@@ -192,17 +223,12 @@ async function imprimirticket(factura) {
     const pageHeight = 216;
     const cornerRadius = 5;
 
-
     // Añadir las plantillas
     doc.addImage(fondo, "PNG", 0, 0, pageWidth, pageHeight);
     doc.addImage(logo, "PNG", 2, 1, 50, 25);
     doc.addImage(cliente, "PNG", 1, 60, 138, 24);
     doc.addImage(pedido, "PNG", 1, 104, 136, 56);
     doc.addImage(escanear, "PNG", -1, 162, 142, 32);
-    // Añadir otras imágenes
-    //   const imgFile4 = "logo.png";
-    // //   const imgData4 = await (imgFile4);
-    //   
 
     // Título "FACTURA ELECTRÓNICA" en negrita
     const title3 = "FACTURA ELECTRÓNICA";
@@ -211,12 +237,9 @@ async function imprimirticket(factura) {
     doc.setFontSize(titleFontSize3);
     doc.setTextColor(0, 0, 0);
 
-    const title3Width =
-        (doc.getStringUnitWidth(title3) * titleFontSize3) /
-        doc.internal.scaleFactor;
+    const title3Width =(doc.getStringUnitWidth(title3) * titleFontSize3) / doc.internal.scaleFactor;
     const title3X = headerWidth - title3Width - 2;
     const title3Y = headerHeight / 2 + titleFontSize3 / 2 - 7;
-
     doc.text(title3, title3X, title3Y);
 
     // Añadir la imagen PQR CUFE
@@ -231,9 +254,7 @@ async function imprimirticket(factura) {
     const cufeFontSize = 12;
     doc.setFont("Helvetica", "bold");
     doc.setFontSize(cufeFontSize);
-    const cufeWidth =
-        (doc.getStringUnitWidth(cufeTitle) * cufeFontSize) /
-        doc.internal.scaleFactor;
+    const cufeWidth = (doc.getStringUnitWidth(cufeTitle) * cufeFontSize) / doc.internal.scaleFactor;
     const cufeTitleX = pqrX + (pqrWidth - cufeWidth) / 2;
     const cufeTitleY = pqrY + pqrHeight + 5; // Ajustar la distancia debajo de la imagen PQR
     doc.text(cufeTitle, cufeTitleX, cufeTitleY);
@@ -284,6 +305,7 @@ async function imprimirticket(factura) {
         "Fecha de suspensión",
         "Fin de período",
     ];
+
     const tiempoFontSize = 8;
     doc.setFont("Helvetica", "bold");
     doc.setFontSize(tiempoFontSize);
@@ -314,9 +336,7 @@ async function imprimirticket(factura) {
     const holaFontSize = 15;
     doc.setFont("Helvetica", "bold");
     doc.setFontSize(holaFontSize);
-    const holaWidth =
-        (doc.getStringUnitWidth(holaMundo) * holaFontSize) /
-        doc.internal.scaleFactor;
+    const holaWidth = (doc.getStringUnitWidth(holaMundo) * holaFontSize) / doc.internal.scaleFactor;
     const holaX = (pageWidth - holaWidth) / 2;
     const holaY = cuadroYy + cuadroHeightt / 5 + holaFontSize / 3; // Centrar verticalmente el texto
     doc.text(holaMundo, holaX, holaY);
@@ -335,9 +355,7 @@ async function imprimirticket(factura) {
     const compraFontSize = 15;
     doc.setFont("Helvetica", "bold");
     doc.setFontSize(compraFontSize);
-    const compraWidth =
-        (doc.getStringUnitWidth(compra) * compraFontSize) /
-        doc.internal.scaleFactor;
+    const compraWidth =  (doc.getStringUnitWidth(compra) * compraFontSize) /  doc.internal.scaleFactor;
     const compraX = (pageWidth - compraWidth) / 2;
     const compraY = cuadroYy + cuadroHeightt + 42; // Centrar verticalmente el texto
     doc.text(compra, compraX, compraY);
@@ -419,33 +437,32 @@ async function imprimirticket(factura) {
     const offsetY = cuadroYy + 14; // Ajustar el inicio del texto
 
     doc.text(` ${factura.nombre}`, offsetX - 60, offsetY + 5);
-    doc.text(` ${factura.identificacion}`, offsetX - 55, offsetY + 13);
-    doc.text(` ${factura.direccion}`, offsetX + 15, offsetY + 13);
-    doc.text(` ${factura.correo}`, offsetX - 65, offsetY + 21);
-    doc.text(` ${factura.telefono}`, offsetX + 15, offsetY + 21);
-    doc.text(` ${factura.idProducto.descripcion}`, offsetX - 80, offsetY + 53);
-    doc.text(` ${factura.idProducto.cantidad}`, offsetX - 43, offsetY + 53);
-    doc.text(` ${factura.idProducto.valor_unitario}`, offsetX - 29, offsetY + 53);
-    doc.text(` ${factura.idImpuesto.valor_retencion}`, offsetX - 15, offsetY + 53);
-    doc.text(` ${factura.idImpuesto.retencion}`, offsetX - 4.5, offsetY + 53);
-    doc.text(` ${factura.idImpuesto.valor_reteica}`, offsetX + 10, offsetY + 53);
-    doc.text(` 119.000`, offsetX + 29, offsetY + 53) //total
-    doc.text(` 119.000`, offsetX + 29, offsetY + 97) //total inferior 
-    doc.text(` ${factura.idImpuesto.valor_retencion}`, offsetX + 30, offsetY + 80); //
-    doc.text(` ${factura.idImpuesto.retencion}`, offsetX + 30, offsetY + 86); //
-    doc.text(` ${factura.idImpuesto.valor_reteica}`, offsetX + 30, offsetY + 92); //
-    //   doc.text(` ${total}`, offsetX + 32, offsetY + 99 , ); // total= (cantidad*precio) + iva - rte- rte_ica
-    //   doc.text(` ${total}`, offsetX + 20, offsetY + 140.5); // tirilla
-    doc.text(` 119.000`, offsetX + 15, offsetY + 142); //tirilla
-    doc.text(` ${factura.nombre}`, offsetX - 70, offsetY + 142); // tirilla
-    doc.text(` ${factura.identificacion}`, offsetX - 70, offsetY + 152); // tirilla
-    doc.text(` 27/09/2024`, offsetX + 15, offsetY + 152); // tirilla
+    // doc.text(` ${factura.identificacion}`, offsetX - 55, offsetY + 13);
+    // doc.text(` ${factura.direccion}`, offsetX + 15, offsetY + 13);
+    // doc.text(` ${factura.correo}`, offsetX - 65, offsetY + 21);
+    // doc.text(` ${factura.telefono}`, offsetX + 15, offsetY + 21);
+    // doc.text(` ${factura.idProducto.descripcion}`, offsetX - 80, offsetY + 53);
+    // doc.text(` ${factura.idProducto.cantidad}`, offsetX - 43, offsetY + 53);
+    // doc.text(` ${factura.idProducto.valor_unitario}`, offsetX - 29, offsetY + 53);
+    // doc.text(` ${factura.idImpuesto.valor_retencion}`, offsetX - 15, offsetY + 53);
+    // doc.text(` ${factura.idImpuesto.retencion}`, offsetX - 4.5, offsetY + 53);
+    // doc.text(` ${factura.idImpuesto.valor_reteica}`, offsetX + 10, offsetY + 53);
+    // doc.text(` 119.000`, offsetX + 29, offsetY + 53) //total
+    // doc.text(` 119.000`, offsetX + 29, offsetY + 97) //total inferior 
+    // doc.text(` ${factura.idImpuesto.valor_retencion}`, offsetX + 30, offsetY + 80); //
+    // doc.text(` ${factura.idImpuesto.retencion}`, offsetX + 30, offsetY + 86); //
+    // doc.text(` ${factura.idImpuesto.valor_reteica}`, offsetX + 30, offsetY + 92); //
+    // //   doc.text(` ${total}`, offsetX + 32, offsetY + 99 , ); // total= (cantidad*precio) + iva - rte- rte_ica
+    // //   doc.text(` ${total}`, offsetX + 20, offsetY + 140.5); // tirilla
+    // doc.text(` 119.000`, offsetX + 15, offsetY + 142); //tirilla
+    // doc.text(` ${factura.nombre}`, offsetX - 70, offsetY + 142); // tirilla
+    // doc.text(` ${factura.identificacion}`, offsetX - 70, offsetY + 152); // tirilla
+    // doc.text(` 27/09/2024`, offsetX + 15, offsetY + 152); // tirilla
 
     const pdfBlob = doc.output('blob');
     const pdfUrl = URL.createObjectURL(pdfBlob);
     window.open(pdfUrl, '_blank');
 }
-
 </script>
 
 <style scoped>
@@ -636,5 +653,9 @@ h1 {
 
     cursor: pointer;
     background: -webkit-linear-gradient(bottom, #b95b5b, #d34646);
+}
+
+ td {
+    /* white-space: nowrap; */
 }
 </style>
