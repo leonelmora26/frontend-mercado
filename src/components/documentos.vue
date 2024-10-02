@@ -1,60 +1,5 @@
-<template>
-    <div class="container">
-        <div class="superior">
-            <div class="titulo">Subir Archivo CSV</div>
-            <div>Subir Archivo CSV:</div>
-            <div>
-                <div class="seleccionar">
-                    <input type="file" accept=".csv" @change="procesarArchivo" style="display: none;" ref="fileInput">
-                    <button @click="abrirSeleccionArchivo()" class="btn"
-                        style="background-color: #007BFF; font-weight: bold; color: white; width: 25%; height: 30%;">
-                        Seleccionar el archivo
-                    </button>
-                    <div v-if="nombreArchivo">{{ nombreArchivo }}</div>
-                    <div v-else>Ningún archivo Seleccionado</div>
-                </div>
-            </div>
 
-            <!-- Tabla -->
-            <div style="width: 90vw;">
-                <div class="btn-agregar">
-                    <button @click="enviarfacturasanidadas()" class="btn" style="color: white; width: 18%;">Enviar
-                        Facturas Anidadas a Alegra</button>
-                    <button @click="enivarfacturassimples()" class="btn" style="color: white; width: 18%;">Enviar
-                        Facturas simples a Alegra</button>
-                    <button @click="procesardatos()" class="btn" style="color: white; width: 18%;">Procesar
-                        Datos</button>
-                    <button @click="lmpiarbasededatos()" class="btn" style="color: white; width: 18%;">Limpiar Base de
-                        Datos</button>
-                    <button @click="subir()" class="btn" style="color: white; width: 18%;">Subir</button>
-                </div>
-
-                <div class="q-pa-md">
-                    <q-table class="my-sticky-virtscroll-table" virtual-scroll flat bordered
-                        v-model:pagination="pagination" :rows-per-page-options="[10, 30, 50]"
-                        :virtual-scroll-sticky-size-start="48" row-key="name" :rows="rows" :columns="columns">
-                        <!-- Columna para el estado -->
-                        <template v-slot:body-cell-estado="props">
-                            <q-td :props="props">
-                                <label v-if="props.row.estado == 1" style="color: green">Activo</label>
-                                <label v-else style="color: red">Inactivo</label>
-                            </q-td>
-                        </template>
-
-                        <!-- Columna para las opciones de editar/activar/inactivar -->
-                        <template v-slot:body-cell-opciones="props">
-                            <q-td :props="props" class="botones">
-                                <button @click="imprimirticket(props.row)" class="edi">
-                                    <i class="fa-solid fa-print"></i>
-                                </button>
-                            </q-td>
-                        </template>
-                    </q-table>
-                </div>
-            </div>
-        </div>
-    </div>
-</template>
+    
 
 
 <script setup>
@@ -77,10 +22,9 @@ const $q = useQuasar();
 const router = useRouter();
 let rows = ref([]);
 let pagination = ref({
-  page: 1,
-  rowsPerPage: 10, // Número de filas por página
-});let usuarios = ref([]);
-
+    page: 1,
+    rowsPerPage: 10, // Número de filas por página
+}); let usuarios = ref([]);
 
 let nombreArchivo = ref("");
 
@@ -91,40 +35,84 @@ function abrirSeleccionArchivo() {
 
 function procesarArchivo(event) {
     const archivo = event.target.files[0];
+
     if (archivo) {
-        nombreArchivo.value = archivo.name;
-    }
-}
-
-
-async function subir() {
-    const archivo = ref('input[type="file"]').files[0];
-    if (!archivo) {
-        alert("Por favor, selecciona un archivo CSV primero.");
-        return;
+        nombreArchivo.value = archivo.name; // Aquí se guarda el nombre del archivo
     }
 
     const reader = new FileReader();
     reader.onload = (e) => {
         const contenido = e.target.result;
+        const lineas = contenido.split("\n").slice(0);
+        const datos = lineas.map(linea => {
+            const columns = linea.split(";").map(col => col.trim());
+            const cantidadProducto = parseFloat(columns[3]) || 0;
+            const valor_unitario = parseFloat(columns[4]) || 0;
+            const porcentajeDescuento = parseFloat(columns[10]) || 0;
+            const reteica = parseFloat(columns[8]) || 0;
+            const retencion = parseFloat(columns[6]) || 0;
+
+            const total = calcularTotal(cantidadProducto, valor_unitario, porcentajeDescuento, reteica, retencion);
+
+            return {
+                nombre: columns[0] || '',
+                identificacion: columns[1] || '',
+                codigo_producto: columns[2] || '',
+                cantidadProducto,
+                valor_unitario,
+                porcentajeDescuento,
+                reteica,
+                retencion,
+                total,
+            };
+        });
+
+        rows.value = datos;
+    };
+    reader.readAsText(archivo);
+}
+
+function calcularTotal(cantidadProducto, valor_unitario, porcentajeDescuento, reteica, retencion) {
+    // Asegurarte de que todos los valores son números válidos
+    cantidadProducto = isNaN(cantidadProducto) ? 0 : parseFloat(cantidadProducto);
+    valor_unitario = isNaN(valor_unitario) ? 0 : parseFloat(valor_unitario);
+    porcentajeDescuento = isNaN(porcentajeDescuento) ? 0 : parseFloat(porcentajeDescuento);
+    reteica = isNaN(reteica) ? 0 : parseFloat(reteica);
+    retencion = isNaN(retencion) ? 0 : parseFloat(retencion);
+
+    const valorBruto = cantidadProducto * valor_unitario;
+    const descuento = (valorBruto * porcentajeDescuento) / 100;
+    const total = valorBruto - descuento - reteica - retencion;
+    return total.toFixed(0);  // Retornar con dos decimales
+}
+
+async function subir() {
+    const archivo = document.querySelector('input[type="file"]').files[0];
+    if (!archivo) {
+        alert("Por favor, selecciona un archivo CSV primero.");
+        return;
+    }
+    const reader = new FileReader();
+    reader.onload = (e) => {
+        const contenido = e.target.result;
         const lineas = contenido.split("\n").slice(0).slice(); // Ignorar el encabezado
-        datosCSV.value= filas.map(fila => fila.split(','));
         const datos = lineas.map(linea => {
             const columns = linea.split(";").map(col => col.trim()); // Separar por ';' y eliminar espacios
             return {
                 nombre: columns[0] || '', // Nombre contacto
                 identificacion: columns[1] || '', // Identificación
                 codigo_producto: columns[2] || '', // Código producto
-                cantidadProducto: columns[""] || '', // Cantidad producto
-                valor_unitario: columns[""] || '', // Valor unitario
-                codigoImpuestoCargo: columns[""] || '', // Código impuesto cargo
-                retencion: columns[""] || '', // Retención
-                valorRetencion: columns[""] || '', // Valor Retención
-                reteica: columns[""] || '', // Reteica
-                valorReteica: columns[""] || '', // Valor Reteica
-                porcentajeDescuento: columns[""] || '', // Porcentaje Descuento
+                cantidadProducto: parseFloat(columns[3]) || 0, // Cantidad producto
+                valor_unitario: parseFloat(columns[4]) || 0, // Valor unitario
+                codigoImpuestoCargo: columns[5] || '', // Código impuesto cargo
+                retencion: parseFloat(columns[6]) || 0, // Retención
+                valorRetencion: columns[7] || '', // Valor Retención
+                reteica: parseFloat(columns[8]) || 0, // Reteica
+                valorReteica: columns[9] || '', // Valor Reteica
+                porcentajeDescuento: parseFloat(columns[10]) || 0, // Porcentaje Descuento
                 fecha_vencimiento: columns[11] || '', // Fecha Vencimiento
                 fecha_elaboracion: columns[12] || '', // Fecha de elaboración
+                total: columns[13] || 0,
                 anidar: columns[13] || '', // Anidar
             };
         });
@@ -140,10 +128,8 @@ async function obtenerInfo() {
         await UsuarioStore.obtenerusuario();
         usuarios.value = UsuarioStore.usuario;
         rows.value = UsuarioStore.usuarios.reverse();
-        console.log('llegan datos', UsuarioStore.usuarios);
 
     } catch (error) {
-        console.log(error);
     };
 };
 
@@ -153,13 +139,14 @@ const columns = [
     { name: 'correo', label: 'Correo', field: "correo", sortable: true, align: 'left', },
     { name: 'direccion', label: 'Dirección Contacto', field: "direccion", sortable: true, align: 'left', },
     { name: 'telefono', label: 'Telefono', field: "telefono", sortable: true, align: 'left', },
+
     {
-        name: 'codigo_producto', label: 'Código Producto	', field: (row) => {
+        name: 'codigo_producto', label: 'Código Producto', field: (row) => {
             return row && row.codigo_producto ? row.codigo_producto : 'N/A';
         }, sortable: true, align: 'left',
     },
     // {/ name: 'valor_unitario', / label: 'Valor Uni', / field: (row) => {/ return row?.idProducto?.valor_unitario ?? 0; // devuelve 0 si no existe/ }, / sortable: true, / align: 'left',// },// {/ name: 'codigo_impuesto_cargo', / label: 'Codigo impuesto cargo', / field: (row) => {/ return row?.idImpuesto?.codigo_impuesto_cargo ?? 0; // devuelve 0 si no existe/ }, / sortable: true, / align: 'left',// },// {/ name: 'retencion', / label: 'Retención', / field: (row) => {/ return row?.idImpuesto?.retencion ?? 0; // devuelve 0 si no existe/ }, / sortable: true, / align: 'left',// },// {/ name: 'valor_retencion', / label: 'Valor Retención', / field: (row) => {/ return row?.idImpuesto?.valor_retencion ?? 0; // devuelve 0 si no existe/ }, / sortable: true, / align: 'left',// },// {/ name: 'reteica', / label: 'Reteica', / field: (row) => {/ return row?.idImpuesto?.reteica ?? 0; // devuelve 0 si no existe/ }, / sortable: true, / align: 'left',// },// {/ name: 'valor_reteica', / label: 'Valor Reteica', / field: (row) => {/ return row?.idImpuesto?.valor_reteica ?? 0; // devuelve 0 si no existe/ }, / sortable: true, / align: 'left',// },// {/ name: 'porcentaje_descuento', / label: 'Porcentaje Descuento', / field: (row) => {/ return row?.idImpuesto?.porcentaje_descuento ?? 0; // devuelve 0 si no existe/ }, / sortable: true, / align: 'left',// }
-    ,{
+    , {
         name: 'fecha_vencimiento',
         label: 'Fecha Vencimiento',
         field: (row) => {
@@ -178,11 +165,12 @@ const columns = [
         align: 'left',
     },
 
-        { name: 'iron', label: 'Anidar',
-        field: (row) =>{
+    {
+        name: 'iron', label: 'Anidar',
+        field: (row) => {
             return row?.anidar ?? ''
         },
-         sortable: true, align: 'left', 
+        sortable: true, align: 'left',
     },
     {
         name: "opciones",
@@ -199,17 +187,8 @@ onMounted(async () => {
     });
 });
 
+
 async function imprimirticket(factura) {
-    if (!factura || !factura.descripcion) {
-        console.error("Factura or descripcion is undefined");
-        $q.notify({
-            color: "negative",
-            position: "top",
-            message: "No se puede imprimir, la factura es inválida o no tiene descripción",
-            icon: "warning"
-        });
-        return;
-    }
     const doc = new jsPDF({
         orientation: "portrait",
         unit: "mm",
@@ -237,7 +216,7 @@ async function imprimirticket(factura) {
     doc.setFontSize(titleFontSize3);
     doc.setTextColor(0, 0, 0);
 
-    const title3Width =(doc.getStringUnitWidth(title3) * titleFontSize3) / doc.internal.scaleFactor;
+    const title3Width = (doc.getStringUnitWidth(title3) * titleFontSize3) / doc.internal.scaleFactor;
     const title3X = headerWidth - title3Width - 2;
     const title3Y = headerHeight / 2 + titleFontSize3 / 2 - 7;
     doc.text(title3, title3X, title3Y);
@@ -355,7 +334,7 @@ async function imprimirticket(factura) {
     const compraFontSize = 15;
     doc.setFont("Helvetica", "bold");
     doc.setFontSize(compraFontSize);
-    const compraWidth =  (doc.getStringUnitWidth(compra) * compraFontSize) /  doc.internal.scaleFactor;
+    const compraWidth = (doc.getStringUnitWidth(compra) * compraFontSize) / doc.internal.scaleFactor;
     const compraX = (pageWidth - compraWidth) / 2;
     const compraY = cuadroYy + cuadroHeightt + 42; // Centrar verticalmente el texto
     doc.text(compra, compraX, compraY);
@@ -436,28 +415,49 @@ async function imprimirticket(factura) {
     const offsetX = 90; // Ajustar el inicio del texto a la derecha
     const offsetY = cuadroYy + 14; // Ajustar el inicio del texto
 
+    factura.total = calcularTotal(
+        factura.cantidadProducto,
+        factura.valor_unitario,
+        factura.porcentajeDescuento,
+        factura.reteica,
+        factura.retencion
+    );
+
     doc.text(` ${factura.nombre}`, offsetX - 60, offsetY + 5);
-    // doc.text(` ${factura.identificacion}`, offsetX - 55, offsetY + 13);
-    // doc.text(` ${factura.direccion}`, offsetX + 15, offsetY + 13);
-    // doc.text(` ${factura.correo}`, offsetX - 65, offsetY + 21);
-    // doc.text(` ${factura.telefono}`, offsetX + 15, offsetY + 21);
-    // doc.text(` ${factura.idProducto.descripcion}`, offsetX - 80, offsetY + 53);
-    // doc.text(` ${factura.idProducto.cantidad}`, offsetX - 43, offsetY + 53);
-    // doc.text(` ${factura.idProducto.valor_unitario}`, offsetX - 29, offsetY + 53);
-    // doc.text(` ${factura.idImpuesto.valor_retencion}`, offsetX - 15, offsetY + 53);
-    // doc.text(` ${factura.idImpuesto.retencion}`, offsetX - 4.5, offsetY + 53);
-    // doc.text(` ${factura.idImpuesto.valor_reteica}`, offsetX + 10, offsetY + 53);
-    // doc.text(` 119.000`, offsetX + 29, offsetY + 53) //total
-    // doc.text(` 119.000`, offsetX + 29, offsetY + 97) //total inferior 
-    // doc.text(` ${factura.idImpuesto.valor_retencion}`, offsetX + 30, offsetY + 80); //
-    // doc.text(` ${factura.idImpuesto.retencion}`, offsetX + 30, offsetY + 86); //
-    // doc.text(` ${factura.idImpuesto.valor_reteica}`, offsetX + 30, offsetY + 92); //
-    // //   doc.text(` ${total}`, offsetX + 32, offsetY + 99 , ); // total= (cantidad*precio) + iva - rte- rte_ica
-    // //   doc.text(` ${total}`, offsetX + 20, offsetY + 140.5); // tirilla
-    // doc.text(` 119.000`, offsetX + 15, offsetY + 142); //tirilla
+    doc.text(` ${factura.identificacion}`, offsetX - 55, offsetY + 13);
+    doc.text(` ${factura.direccion}`, offsetX + 15, offsetY + 13);
+    doc.text(` ${factura.correo}`, offsetX - 65, offsetY + 21);
+    doc.text(` ${factura.telefono}`, offsetX + 15, offsetY + 21);
+    doc.text(` ${factura.codigo_producto}`, offsetX - 75, offsetY + 53);
+    doc.text(` ${factura.cantidadProducto}`, offsetX - 43, offsetY + 53);
+    doc.text(` ${factura.valor_unitario}`, offsetX - 29, offsetY + 53);
+    doc.text(` ${factura.porcentajeDescuento}`, offsetX - 15, offsetY + 53);
+    doc.text(` ${factura.retencion}`, offsetX - 4.5, offsetY + 53);
+    doc.text(` ${factura.reteica}`, offsetX + 10, offsetY + 53);
+    doc.text(` ${factura.total}`, offsetX + 29, offsetY + 53) //total
+    doc.text(` ${factura.total}`, offsetX + 29, offsetY + 97) //total inferior 
+    doc.text(` ${factura.valor_unitario}`, offsetX + 29, offsetY + 75)
+    doc.text(` ${factura.porcentajeDescuento}`, offsetX + 30, offsetY + 80); //
+    doc.text(` ${factura.retencion}`, offsetX + 30, offsetY + 86); //
+    doc.text(` ${factura.reteica}`, offsetX + 30, offsetY + 92); //
+
+    // Formatear el total para que muestre los puntos de mil
+    const totalFormateado = Number(factura.total).toLocaleString('es-ES');
+    doc.text(`$${totalFormateado}`, offsetX + 15, offsetY + 141); // tirilla
+
+    function limitarCaracteres(texto, limiteCaracteres) {
+        if (texto.length > limiteCaracteres) {
+            return texto.slice(0, limiteCaracteres) + '...';
+        }
+        return texto;
+    }
+    // Limitar a 15 caracteres el texto de factura.nombre
+    const nombreLimitado = limitarCaracteres(factura.nombre, 25);
+    doc.text(` ${nombreLimitado}`, offsetX - 70, offsetY + 141); // tirilla 
+
     // doc.text(` ${factura.nombre}`, offsetX - 70, offsetY + 142); // tirilla
-    // doc.text(` ${factura.identificacion}`, offsetX - 70, offsetY + 152); // tirilla
-    // doc.text(` 27/09/2024`, offsetX + 15, offsetY + 152); // tirilla
+    doc.text(` ${factura.identificacion}`, offsetX - 55, offsetY + 151); // tirilla
+    doc.text(` 27/09/2024`, offsetX + 12, offsetY + 151); // tirilla
 
     const pdfBlob = doc.output('blob');
     const pdfUrl = URL.createObjectURL(pdfBlob);
@@ -653,9 +653,5 @@ h1 {
 
     cursor: pointer;
     background: -webkit-linear-gradient(bottom, #b95b5b, #d34646);
-}
-
- td {
-    /* white-space: nowrap; */
 }
 </style>
