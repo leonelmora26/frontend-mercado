@@ -1,5 +1,60 @@
+<template>
+    <div class="container">
+        <div class="superior">
+            <div class="titulo">Subir Archivo CSV</div>
+            <div>Subir Archivo CSV:</div>
+            <div>
+                <div class="seleccionar">
+                    <input type="file" accept=".csv" @change="procesarArchivo" style="display: none;" ref="fileInput">
+                    <button @click="abrirSeleccionArchivo()" class="btn"
+                        style="background-color: #007BFF; font-weight: bold; color: white; width: 25%; height: 30%;">
+                        Seleccionar el archivo
+                    </button>
+                    <div v-if="nombreArchivo">{{ nombreArchivo }}</div>
+                    <div v-else>Ningún archivo Seleccionado</div>
+                </div>
+            </div>
 
-    
+            <!-- Tabla -->
+            <div style="width: 90vw;">
+                <div class="btn-agregar">
+                    <button @click="enviarfacturasanidadas()" class="btn" style="color: white; width: 18%;">Enviar
+                        Facturas Anidadas a Alegra</button>
+                    <button @click="enivarfacturassimples()" class="btn" style="color: white; width: 18%;">Enviar
+                        Facturas simples a Alegra</button>
+                    <button @click="procesardatos()" class="btn" style="color: white; width: 18%;">Procesar
+                        Datos</button>
+                    <button @click="lmpiarbasededatos()" class="btn" style="color: white; width: 18%;">Limpiar Base de
+                        Datos</button>
+                    <button @click="subir()" class="btn" style="color: white; width: 18%;">Subir</button>
+                </div>
+
+                <div class="q-pa-md">
+                    <q-table class="my-sticky-virtscroll-table" virtual-scroll flat bordered
+                        v-model:pagination="pagination" :rows-per-page-options="[10, 30, 50]"
+                        :virtual-scroll-sticky-size-start="48" row-key="name" :rows="rows" :columns="columns">
+                        <!-- Columna para el estado -->
+                        <template v-slot:body-cell-estado="props">
+                            <q-td :props="props">
+                                <label v-if="props.row.estado == 1" style="color: green">Activo</label>
+                                <label v-else style="color: red">Inactivo</label>
+                            </q-td>
+                        </template>
+
+                        <!-- Columna para las opciones de editar/activar/inactivar -->
+                        <template v-slot:body-cell-opciones="props">
+                            <q-td :props="props" class="botones">
+                                <button @click="imprimirticket(props.row)" class="edi">
+                                    <i class="fa-solid fa-print"></i>
+                                </button>
+                            </q-td>
+                        </template>
+                    </q-table>
+                </div>
+            </div>
+        </div>
+    </div>
+</template>
 
 
 <script setup>
