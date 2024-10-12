@@ -104,18 +104,25 @@ export default {
       }
     },
 
-    calcularTotal(cantidadProducto, valor_unitario, codigoImpuestoCargo, reteica, retencion) {
+    calcularTotal(cantidadProducto, valor_unitario, codigoImpuestoCargo, valorReteica, valor_retencion) {
       // Asegurarte de que todos los valores son números válidos
       cantidadProducto = isNaN(cantidadProducto) ? 0 : parseFloat(cantidadProducto);
       valor_unitario = isNaN(valor_unitario) ? 0 : parseFloat(valor_unitario);
       codigoImpuestoCargo = isNaN(codigoImpuestoCargo) ? 0 : parseFloat(codigoImpuestoCargo);
-      reteica = isNaN(reteica) ? 0 : parseFloat(reteica);
-      retencion = isNaN(retencion) ? 0 : parseFloat(retencion);
+      valorReteica = isNaN(valorReteica) ? 0 : parseFloat(valorReteica);
+      valor_retencion = isNaN(valor_retencion) ? 0 : parseFloat(valor_retencion);
 
       const valorBruto = cantidadProducto * valor_unitario;
-      const descuento = (valorBruto * codigoImpuestoCargo) / 100;
-      const total = valorBruto + descuento - reteica - retencion;
-      return total.toFixed(0);  // Retornar con dos decimales
+      let descuento = 0;
+      // Si el código de impuesto es 3, aplicar el cálculo especial
+      if (codigoImpuestoCargo === 3) {
+        descuento = (valorBruto * 19) / 100;
+      } else {
+        descuento = (valorBruto * codigoImpuestoCargo) / 100;
+      }
+      const total = valorBruto + descuento - valorReteica - valor_retencion;
+      console.log("descuento", descuento)
+      return total.toFixed(0);  // Retornar sin decimales
     },
 
     calcularSubtotal(cantidadProducto, valor_unitario) {
@@ -153,9 +160,9 @@ export default {
         this.rows = filas.slice(1).map((fila, index) => {
           const cantidadProducto = parseFloat(fila[3]) || 0;
           const valor_unitario = parseFloat(fila[4]) || 0;
-          const codigoImpuestoCargo = parseFloat(fila[5 ]) || 0;
-          const reteica = parseFloat(fila[8]) || 0;
-          const retencion = parseFloat(fila[6]) || 0;
+          const codigoImpuestoCargo = parseFloat(fila[5]) || 0;
+          const valorReteica = parseFloat(fila[9]) || 0;
+          const valor_retencion = parseFloat(fila[7]) || 0;
 
           return {
             nombre: fila[0],
@@ -164,15 +171,15 @@ export default {
             cantidadProducto: cantidadProducto,
             valor_unitario: valor_unitario,
             codigoImpuestoCargo: fila[5],
-            retencion: retencion,
-            valorRetencion: fila[7],
-            reteica: reteica,
+            valor_retencion: valor_retencion,
+            valorvalor_retencion: fila[7],
+            valorReteica: valorReteica,
             valorReteica: fila[9],
             codigoImpuestoCargo: codigoImpuestoCargo,
             fecha_vencimiento: fila[11],
             fecha_elaboracion: fila[12],
             anidar: fila[13] || '',
-            total: this.calcularTotal(cantidadProducto, valor_unitario, codigoImpuestoCargo, reteica, retencion),
+            total: this.calcularTotal(cantidadProducto, valor_unitario, codigoImpuestoCargo, valorReteica, valor_retencion),
           };
         });
       }
@@ -427,11 +434,11 @@ export default {
         factura.cantidadProducto,
         factura.valor_unitario,
         factura.codigoImpuestoCargo,
-        factura.reteica,
-        factura.retencion
+        factura.valorReteica,
+        factura.valor_retencion
       );
-      
-      factura.subtotal= this.calcularSubtotal(
+
+      factura.subtotal = this.calcularSubtotal(
         factura.cantidadProducto,
         factura.valor_unitario
       )
@@ -442,21 +449,23 @@ export default {
       doc.text(` ${factura.codigo_producto}`, offsetX - 75, offsetY + 53);
       doc.text(` ${factura.cantidadProducto}`, offsetX - 43, offsetY + 53);
       doc.text(` ${factura.valor_unitario}`, offsetX - 29, offsetY + 53);
-      doc.text(` ${factura.codigoImpuestoCargo}`, offsetX - 15, offsetY + 53);
-      doc.text(` ${factura.retencion}`, offsetX - 4.5, offsetY + 53);
-      doc.text(` ${factura.reteica}`, offsetX + 10, offsetY + 53);
+      const impuestoImprimir = factura.codigoImpuestoCargo === 3 ? 19 : factura.codigoImpuestoCargo;
+      doc.text(` ${impuestoImprimir}`, offsetX - 15, offsetY + 53); //
+      // doc.text(` ${factura.codigoImpuestoCargo}`, offsetX - 15, offsetY + 53);
+      doc.text(` ${factura.valor_retencion}`, offsetX - 4.5, offsetY + 53);
+      doc.text(` ${factura.valorReteica}`, offsetX + 10, offsetY + 53);
       // doc.text(` ${factura.total}`, offsetX + 29, offsetY + 53); //total
       // doc.text(` ${factura.total}`, offsetX + 29, offsetY + 53); //subtotal 
       doc.text(` ${factura.total}`, offsetX + 29, offsetY + 97); //total inferior 
       doc.text(` ${factura.valor_unitario}`, offsetX + 29, offsetY + 75);
-      doc.text(` ${factura.codigoImpuestoCargo}`, offsetX + 30, offsetY + 80); //
-      doc.text(` ${factura.retencion}`, offsetX + 30, offsetY + 86); //
-      doc.text(` ${factura.reteica}`, offsetX + 30, offsetY + 92); //
+      doc.text(` ${impuestoImprimir}`, offsetX + 30, offsetY + 80); //
+      doc.text(` ${factura.valor_retencion}`, offsetX + 30, offsetY + 86); //
+      doc.text(` ${factura.valorReteica}`, offsetX + 30, offsetY + 92); //
       doc.text(` ${factura.identificacion}`, offsetX - 55, offsetY + 151); // tirilla
       doc.text(` 27/09/2024`, offsetX + 12, offsetY + 151); // tirilla
 
-      const subtotal= Number(factura.subtotal).toLocaleString('es-Es');
-      doc.text(`${subtotal}`,offsetX + 29, offsetY + 53);
+      const subtotal = Number(factura.subtotal).toLocaleString('es-Es');
+      doc.text(`${subtotal}`, offsetX + 29, offsetY + 53);
       // Formatear el total para que muestre los puntos de mil
       const totalFormateado = Number(factura.total).toLocaleString('es-ES');
       doc.text(`$${totalFormateado}`, offsetX + 15, offsetY + 141); // tirilla
@@ -479,12 +488,12 @@ export default {
       // doc.save('ticket.pdf');
       const pdfBlob = doc.output('blob');
       const pdfUrl = URL.createObjectURL(pdfBlob);
-      window.open(pdfUrl, '_blank');  
+      window.open(pdfUrl, '_blank');
       const link = document.createElement('a');
-link.href = pdfUrl;
-link.download = `Factura Electronica ${factura.nombre}.pdf`; // Nombre del archivo
-link.click();
-    }, 
+      link.href = pdfUrl;
+      link.download = `Factura Electronica ${factura.nombre}.pdf`; // Nombre del archivo
+      link.click();
+    },
   },
 };
 </script>
