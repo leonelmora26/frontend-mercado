@@ -174,7 +174,6 @@ export default {
             valor_retencion: valor_retencion,
             valorvalor_retencion: fila[7],
             valorReteica: valorReteica,
-            valorReteica: fila[9],
             codigoImpuestoCargo: codigoImpuestoCargo,
             fecha_vencimiento: fila[11],
             fecha_elaboracion: fila[12],
@@ -276,8 +275,22 @@ export default {
         }
       }
 
-      // Añadir las fechas sobre los puntos
-      const fechas = ["25/08", "30/08", "05/09"];
+      // Función para obtener el último día del mes actual
+
+      function obtenerUltimoDiaDelMes(fechaReferencia) {
+        // Separar el día, mes y año de la fecha en formato 'DD/MM/YYYY'
+        const [dia, mes, anio] = fechaReferencia.split('/').map(Number);
+        // Crear una nueva fecha al primer día del mes siguiente, y luego restar un día
+        const ultimoDia = new Date(anio, mes, 0).getDate();
+        return `${String(ultimoDia).padStart(2, '0')}/${String(mes).padStart(2, '0')}/${anio}`;
+      }
+
+      // Añadir las fechas sobre los puntos 
+      const fechas = [
+        factura.fecha_elaboracion,
+        factura.fecha_vencimiento,
+        obtenerUltimoDiaDelMes(factura.fecha_elaboracion) // Usar la fecha de elaboración para obtener solo el mes y el año
+      ];
       const fechaFontSize = 8;
       doc.setFont("Helvetica", "bold");
       doc.setFontSize(fechaFontSize);
@@ -294,6 +307,8 @@ export default {
       }
 
       // Añadir el contenido de tiempo debajo de los puntos
+
+
       const tiempo = [
         "Inicio de período",
         "Fecha de suspensión",
@@ -453,16 +468,17 @@ export default {
       doc.text(` ${impuestoImprimir}`, offsetX - 15, offsetY + 53); //
       // doc.text(` ${factura.codigoImpuestoCargo}`, offsetX - 15, offsetY + 53);
       doc.text(` ${factura.valor_retencion}`, offsetX - 4.5, offsetY + 53);
-      doc.text(` ${factura.valorReteica}`, offsetX + 10, offsetY + 53);
-      // doc.text(` ${factura.total}`, offsetX + 29, offsetY + 53); //total
+      const valorReteicaFormateado = factura.valorReteica || 0;
+      doc.text(` ${valorReteicaFormateado}`, offsetX + 10, offsetY + 53);
+      // doc.text(` ${factura.total}`, offsetX + 29, offsetY + 53); //total 
       // doc.text(` ${factura.total}`, offsetX + 29, offsetY + 53); //subtotal 
       doc.text(` ${factura.total}`, offsetX + 29, offsetY + 97); //total inferior 
       doc.text(` ${factura.valor_unitario}`, offsetX + 29, offsetY + 75);
-      doc.text(` ${impuestoImprimir}`, offsetX + 30, offsetY + 80); //
+      doc.text(` ${factura.codigoImpuestoCargo}`, offsetX + 30, offsetY + 80); //
       doc.text(` ${factura.valor_retencion}`, offsetX + 30, offsetY + 86); //
       doc.text(` ${factura.valorReteica}`, offsetX + 30, offsetY + 92); //
       doc.text(` ${factura.identificacion}`, offsetX - 55, offsetY + 151); // tirilla
-      doc.text(` 27/09/2024`, offsetX + 12, offsetY + 151); // tirilla
+      doc.text(` ${factura.fecha_vencimiento}`, offsetX + 12, offsetY + 151); // tirilla
 
       const subtotal = Number(factura.subtotal).toLocaleString('es-Es');
       doc.text(`${subtotal}`, offsetX + 29, offsetY + 53);
