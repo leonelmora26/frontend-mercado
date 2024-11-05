@@ -18,12 +18,12 @@
       <!-- Botones de acción -->
       <div class="btn-agregar">
         <button @click="enviarFacturasAnidadas" class="btn" style="color: white; width: 18%;">Enviar Facturas Anidadas a
-          Alegra</button>
-        <button @click="enviarFacturasSimples" class="btn" style="color: white; width: 18%;">Enviar Facturas Simples a
-          Alegra</button>
+          facturastore</button>
+        <button @click="enviarFacturaSimples" class="btn" style="color: white; width: 18%;">Enviar Facturas Simples</button>
         <button @click="procesarDatos" class="btn" style="color: white; width: 18%;">Procesar Datos</button>
         <button @click="limpiarBaseDeDatos" class="btn" style="color: white; width: 18%;">Limpiar Base de Datos</button>
         <button @click="subirArchivo" class="btn" style="color: white; width: 18%;">Subir</button>
+
       </div>
 
       <!-- Tabla -->
@@ -55,6 +55,7 @@
 
 <script>
 import { jsPDF } from 'jspdf'; // Importar jsPDFx
+import { ref } from 'vue';
 import axios from 'axios';
 import fondo from "../assets/fondo.png"
 import logo from "../assets/logo.png"
@@ -62,7 +63,14 @@ import cufe from "../assets/cufe.png"
 import cliente from "../assets/cliente.png"
 import pedido from "../assets/tabla-de-pedido.png"
 import escanear from "../assets/escanear.png"
+import { useFacturaStore } from "../stores/alegra.js"
+import { createPinia } from 'pinia';
 
+const pinia = createPinia();
+const facturaStore = useFacturaStore(pinia);
+const resultado = ref(null);
+
+// import factura from "../stores/factura.js"
 export default {
   data() {
     return {
@@ -121,7 +129,6 @@ export default {
         descuento = (valorBruto * codigoImpuestoCargo) / 100;
       }
       const total = valorBruto + descuento - valorReteica - valor_retencion;
-      console.log("descuento", descuento)
       return total.toFixed(0);  // Retornar sin decimales
     },
 
@@ -133,75 +140,113 @@ export default {
       const subtotal = cantidadProducto * valor_unitario;
       return subtotal.toFixed(0);  // Retornar sin decimales
     },
+    
     async subirArchivo() {
-      const archivo = this.$refs.fileInput.files[0];
-      if (!archivo) {
-        alert('Por favor, selecciona un archivo CSV');
-        return;
-      }
+  const archivo = this.$refs.fileInput.files[0];
+  if (!archivo) {
+    alert('Por favor, selecciona un archivo CSV');
+    return;
+  }
 
-      const reader = new FileReader();
+  const reader = new FileReader();
 
-      reader.onload = (event) => {
-        const contenido = event.target.result;
-        const filas = contenido.split('\n').map(fila => fila.split(';'));
+  reader.onload = (event) => {
+    const contenido = event.target.result;
+    const filas = contenido.split('\n').map(fila => fila.split(';'));
 
-        this.rows = filas.slice(1).map((fila, index) => {
-          const cantidadProducto = parseFloat(fila[3]) || 0;
-          const valor_unitario = parseFloat(fila[4]) || 0;
+    // Ignorar el encabezado y convertir las filas en un objeto para usar en la tabla
+    this.rows = filas.slice(1).map((fila, index) => {
+      const cantidadProducto = parseFloat(fila[3]) || 0;
+      const valor_unitario = parseFloat(fila[4]) || 0;
+      const codigoImpuestoCargo = parseFloat(fila[5]) || 0;
+      const valorReteica = parseFloat(fila[9]) || 0;
+      const valor_retencion = parseFloat(fila[7]) || 0;
 
-          return {
-            // Otros campos de la fila...
-            subtotal: this.calcularSubtotal(cantidadProducto, valor_unitario),
-          };
-        });
-
-        // Ignorar el encabezado y convertir las filas en un objeto para usar en la tabla
-        this.rows = filas.slice(1).map((fila, index) => {
-          const cantidadProducto = parseFloat(fila[3]) || 0;
-          const valor_unitario = parseFloat(fila[4]) || 0;
-          const codigoImpuestoCargo = parseFloat(fila[5]) || 0;
-          const valorReteica = parseFloat(fila[9]) || 0;
-          const valor_retencion = parseFloat(fila[7]) || 0;
-
-          return {
-            nombre: fila[0],
-            identificacion: fila[1],
-            codigo_producto: fila[2],
-            cantidadProducto: cantidadProducto,
-            valor_unitario: valor_unitario,
-            codigoImpuestoCargo: fila[5],
-            valor_retencion: valor_retencion,
-            valorvalor_retencion: fila[7],
-            valorReteica: valorReteica,
-            codigoImpuestoCargo: codigoImpuestoCargo,
-            fecha_vencimiento: fila[11],
-            fecha_elaboracion: fila[12],
-            anidar: fila[13] || '',
-            total: this.calcularTotal(cantidadProducto, valor_unitario, codigoImpuestoCargo, valorReteica, valor_retencion),
-          };
-        });
-      }
-
-      reader.onerror = (error) => {
-        console.error('Error al leer el archivo:', error);
+      return {
+        nombre: fila[0],
+        identificacion: fila[1],
+        codigo_producto: fila[2],
+        cantidadProducto: cantidadProducto,
+        valor_unitario: valor_unitario,
+        codigoImpuestoCargo: codigoImpuestoCargo,
+        valor_retencion: valor_retencion,
+        valorReteica: valorReteica,
+        fecha_vencimiento: fila[11],
+        fecha_elaboracion: fila[12],
+        anidar: fila[13] || '',
+        total: this.calcularTotal(cantidadProducto, valor_unitario, codigoImpuestoCargo, valorReteica, valor_retencion),
       };
+    });
+  };
 
-      reader.readAsText(archivo);
-    },
+  reader.onerror = (error) => {
 
+  };
+
+  reader.readAsText(archivo);
+},
     enviarFacturasAnidadas() {
       // Lógica para enviar facturas anidadas
     },
-    enviarFacturasSimples() {
-      // Lógica para enviar facturas simples
-    },
+
+    async enviarFacturaSimples() {
+  if (this.rows.length === 0) {
+    alert("No hay datos para enviar. Por favor, carga un archivo CSV primero.");
+    return;
+  }
+
+  try {
+    const responses = await Promise.all(
+      this.rows.map(async (factura, index) => {
+        const datosFactura = {
+          nombre: factura.nombre,
+          identification: factura.identificacion,
+          codigo_producto: factura.codigo_producto,
+          cantidadProducto: factura.cantidadProducto,
+          valor_unitario: factura.valor_unitario,
+          codigoImpuestoCargo: factura.codigoImpuestoCargo,
+          valor_retencion: factura.valor_retencion,
+          valorReteica: factura.valorReteica,
+          fecha_vencimiento: factura.fecha_vencimiento,
+          fecha_elaboracion: factura.fecha_elaboracion,
+          anidar: factura.anidar,
+          total: factura.total,
+        };
+
+        console.log(`Enviando factura ${index + 1}:`, datosFactura);
+
+        try {
+          return await facturaStore.enviarFactura(datosFactura);
+        } catch (error) {
+          console.error(`Error en enviarFactura para factura ${index + 1}:`, error);
+          return { success: false, error: error.message };
+        }
+      })
+    );
+
+    responses.forEach((response, index) => {
+      if (response.success) {
+        console.log(`Factura ${index + 1} enviada exitosamente:`, response);
+      } else {
+        console.error(`Error al enviar factura ${index + 1}:`, response.error || "Error desconocido");
+        alert(`Error al enviar la factura ${index + 1}: ${response.error || "Error desconocido"}`);
+      }
+    });
+  } catch (error) {
+    console.error("Error global al enviar las facturas:", error);
+    alert("Ocurrió un error al enviar las facturas. Por favor, revisa la consola para más detalles.");
+  }
+}
+,
     procesarDatos() {
       // Lógica para procesar los datos
     },
-    limpiarBaseDeDatos() {
-      // Lógica para limpiar la base de datos
-    },
+  limpiarBaseDeDatos() {
+    // Vaciar la tabla
+    this.rows = [];
+    // Puedes agregar más lógica aquí si es necesario, como mostrar un mensaje de confirmación
+    alert('La base de datos ha sido limpiada.');
+  },
     imprimirTicket(factura) {
       const doc = new jsPDF({
         orientation: "portrait",
@@ -478,7 +523,7 @@ export default {
       doc.text(` ${factura.valor_retencion}`, offsetX + 30, offsetY + 86); //
       doc.text(` ${factura.valorReteica}`, offsetX + 30, offsetY + 92); //
       doc.text(` ${factura.identificacion}`, offsetX - 55, offsetY + 151); // tirilla
-      doc.text(` ${factura.fecha_vencimiento}`, offsetX + 12, offsetY + 151); // tirilla
+      doc.text(` ${factura.fecha_elaboracion}`, offsetX + 12, offsetY + 151); // tirilla
 
       const subtotal = Number(factura.subtotal).toLocaleString('es-Es');
       doc.text(`${subtotal}`, offsetX + 29, offsetY + 53);
@@ -585,7 +630,7 @@ export default {
 
 .btn-agregar {
   width: 100%;
-  margin-bottom: 5px;
+  margin-bottom: 20px;
   display: flex;
   color: white;
   /* margin-left: 19px; */
@@ -696,11 +741,15 @@ h1 {
 .btn {
   font-family: "Letra";
   width: 100px;
-
   border-radius: 5px;
   border: none;
-
   cursor: pointer;
   background: -webkit-linear-gradient(bottom, #b95b5b, #d34646);
 }
+
+.superior{
+  width:120%
+}
+
+
 </style>
