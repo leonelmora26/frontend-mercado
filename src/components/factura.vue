@@ -17,10 +17,10 @@
 
       <!-- Botones de acción -->
       <div class="btn-agregar">
-        <button @click="enviarFacturasAnidadas" class="btn" style="color: white; width: 18%;">Enviar Facturas Anidadas a
-          facturastore</button>
-        <button @click="enviarFacturaSimples" class="btn" style="color: white; width: 18%;">Enviar Facturas Simples</button>
-        <button @click="procesarDatos" class="btn" style="color: white; width: 18%;">Procesar Datos</button>
+        <button @click="enviarFacturaSimples" class="btn" style="color: white; width: 18%;">Enviar Facturas
+          Simples</button>
+        <button @click="enviarFacturasAnidadas" class="btn" style="color: white; width: 18%;">Enviar Facturas
+          Anidadas</button>
         <button @click="limpiarBaseDeDatos" class="btn" style="color: white; width: 18%;">Limpiar Base de Datos</button>
         <button @click="subirArchivo" class="btn" style="color: white; width: 18%;">Subir</button>
 
@@ -559,6 +559,7 @@ export default {
 };
 </script>
 
+
 <style scoped>
 .container {
   height: 100vh;
@@ -636,7 +637,7 @@ export default {
   /* margin-left: 19px; */
   align-items: center;
   flex-direction: row;
-  justify-content: space-around;
+  justify-content: space-between;
 }
 
 .body {
@@ -662,7 +663,6 @@ hr {
   background-color: rgba(255, 0, 0, 0.429);
   padding: 15px;
   text-align: center;
-  font-family: "Letra";
   font-weight: bold;
   width: 310px;
   border: 3px solid red;
@@ -681,7 +681,6 @@ hr {
 }
 
 h1 {
-  font-family: "Letra";
   text-align: center;
   margin: 0;
   align-items: center;
@@ -690,7 +689,6 @@ h1 {
 
 .text-h6 {
   font-size: 28px;
-  font-family: "Letra";
   margin-bottom: 10px;
 }
 
@@ -739,7 +737,6 @@ h1 {
 }
 
 .btn {
-  font-family: "Letra";
   width: 100px;
   border-radius: 5px;
   border: none;
@@ -747,9 +744,7 @@ h1 {
   background: -webkit-linear-gradient(bottom, #b95b5b, #d34646);
 }
 
-.superior{
-  width:120%
+.superior {
+  width: 120%
 }
-
-
 </style>
