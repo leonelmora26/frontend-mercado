@@ -27,7 +27,7 @@
       </div>
 
       <!-- Tabla -->
-      <div style="width: 90vw;">
+      <div style="width: 65vw;">
         <q-table class="my-sticky-virtscroll-table" virtual-scroll flat bordered v-model:pagination="pagination"
           :rows-per-page-options="[10, 30, 50]" :virtual-scroll-sticky-size-start="48" row-key="name" :rows="rows"
           :columns="columns">
@@ -103,13 +103,147 @@ export default {
     abrirSeleccionArchivo() {
       this.$refs.fileInput.click();
     },
-    procesarArchivo(event) {
-      const archivo = event.target.files[0];
-      if (archivo) {
-        this.nombreArchivo = archivo.name;
-      } else {
-        this.nombreArchivo = '';
+
+    // procesarArchivo(datos) {
+    //   const archivo = datos.target.files[0];
+    //   if (archivo) {
+    //     this.nombreArchivo = archivo.name;
+
+    //     const reader = new FileReader();
+    //     reader.onload = (e) => {
+    //       const contenido = e.target.result;
+
+    //       // Dividir en filas
+    //       const filas = contenido.split('\n');
+    //       const encabezados = filas[0].split(';'); // Primera fila como encabezados
+    //       const datos = [];
+
+    //       // Convertir filas en objetos usando encabezados
+    //       for (let i = 1; i < filas.length; i++) {
+    //         const columnas = filas[i].split(';');
+    //         const objeto = {};
+
+    //         encabezados.forEach((header, index) => {
+    //           objeto[header.trim()] = columnas[index]?.trim();
+    //         });
+
+    //         datos.push(objeto);
+    //       }
+
+    //       // Crear un objeto para almacenar las facturas con identificación única
+    //       const facturasUnicas = {};
+
+    //       datos.forEach((dato) => {
+    //         const identificacion = dato["Identificación tercero"]?.trim();  // Eliminar espacios en blanco
+
+    //         // Crear un objeto que contenga solo los datos necesarios para datos extra
+    //         const datosFiltrados = {
+    //           "Código producto": dato["Código producto"],
+    //           "Cantidad producto": dato["Cantidad producto"],
+    //           "Valor unitario": dato["Valor unitario"],
+    //           "Código impuesto cargo": dato["Código impuesto cargo"],
+    //           "Valor Retencion": dato["Valor Retencion"],
+    //           "Valor Reteica": dato["Valor Reteica"],
+
+    //         };
+
+    //         if (!facturasUnicas[identificacion]) {
+    //           // Si no existe en el objeto, agregar la factura inicial
+    //           facturasUnicas[identificacion] = { ...dato, datosExtra: [] };
+    //           console.log("Agregado como nueva factura:", facturasUnicas[identificacion]);
+    //         } else {
+    //           // Si ya existe, agregar solo los datos necesarios a datosExtra
+    //           facturasUnicas[identificacion].datosExtra.push(datosFiltrados);
+    //           console.log("Datos adicionales agregados a factura existente:", facturasUnicas[identificacion]);
+    //         }
+    //       });
+
+    //       // Convertir el objeto de facturas únicas en un array para poder subirlo a la tabla
+    //       const datosParaTabla = Object.values(facturasUnicas);
+    //       console.log('imprimir', datosParaTabla)
+    //       // Lógica para subir datosParaTabla a la tabla
+    //       this.subirATabla(datosParaTabla);
+    //     };
+
+    //     reader.readAsText(archivo);
+    //   } else {
+    //     this.nombreArchivo = '';
+    //   }
+    // },
+
+    // subirATabla(datos) {
+    //   // Implementación para subir los datos a la tabla en tu aplicación.
+    //   this.datosTabla = datos;
+    // },
+
+    async subirArchivo() {
+      const archivo = this.$refs.fileInput.files[0];
+      if (!archivo) {
+        alert('Por favor, selecciona un archivo CSV');
+        return;
       }
+
+      const reader = new FileReader();
+
+      reader.onload = (datos) => {
+        const contenido = datos.target.result;
+        const filas = contenido.split('\n').map(fila => fila.split(';'));
+
+        // Crear un objeto para almacenar facturas agrupadas por 'identificacion'
+        const facturasAgrupadas = {};
+
+        // Ignorar el encabezado y convertir las filas en un objeto para usar en la tabla
+        filas.slice(1).forEach((fila) => {
+          const cantidadProducto = parseFloat(fila[3]) || 0;
+          const valor_unitario = parseFloat(fila[4]) || 0;
+          const codigoImpuestoCargo = parseFloat(fila[5]) || 0;
+          const valorReteica = parseFloat(fila[9]) || 0;
+          const valor_retencion = parseFloat(fila[7]) || 0;
+
+          const identificacion = fila[1];  // Suponemos que la identificacion está en la columna 1
+          const nombre = fila[0];  // Suponemos que el nombre está en la columna 0
+          const codigo_producto = fila[2];
+          const fecha_vencimiento = fila[11];
+          const fecha_elaboracion = fila[12];
+          const anidar = fila[13] || '';
+
+          // Si ya existe una factura con esta 'identificacion', sumamos los valores
+          if (facturasAgrupadas[identificacion]) {
+            // Sumamos las cantidades y valores
+            // facturasAgrupadas[identificacion].cantidadProducto += cantidadProducto;
+            // facturasAgrupadas[identificacion].valor_unitario += valor_unitario;
+            // facturasAgrupadas[identificacion].codigoImpuestoCargo += codigoImpuestoCargo;
+            // facturasAgrupadas[identificacion].valor_retencion += valor_retencion;
+            // facturasAgrupadas[identificacion].valorReteica += valorReteica;
+            // Actualizamos otros campos si es necesario, por ejemplo 'fecha_vencimiento'
+          } else {
+            // Si es una factura nueva, la agregamos al objeto
+            facturasAgrupadas[identificacion] = {
+              nombre,
+              identificacion,
+              codigo_producto,
+              cantidadProducto,
+              valor_unitario,
+              codigoImpuestoCargo,
+              valor_retencion,
+              valorReteica,
+              fecha_vencimiento,
+              fecha_elaboracion,
+              anidar,
+              total: this.calcularTotal(cantidadProducto, valor_unitario, codigoImpuestoCargo, valorReteica, valor_retencion),
+            };
+          }
+        });
+
+        // Convertir el objeto de facturas agrupadas en un array para usarlo en la tabla
+        this.rows = Object.values(facturasAgrupadas);
+      };
+
+      reader.onerror = (error) => {
+        console.error("Error al leer el archivo:", error);
+      };
+
+      reader.readAsText(archivo);
     },
 
     calcularTotal(cantidadProducto, valor_unitario, codigoImpuestoCargo, valorReteica, valor_retencion) {
@@ -140,113 +274,68 @@ export default {
       const subtotal = cantidadProducto * valor_unitario;
       return subtotal.toFixed(0);  // Retornar sin decimales
     },
-    
-    async subirArchivo() {
-  const archivo = this.$refs.fileInput.files[0];
-  if (!archivo) {
-    alert('Por favor, selecciona un archivo CSV');
-    return;
-  }
-
-  const reader = new FileReader();
-
-  reader.onload = (event) => {
-    const contenido = event.target.result;
-    const filas = contenido.split('\n').map(fila => fila.split(';'));
-
-    // Ignorar el encabezado y convertir las filas en un objeto para usar en la tabla
-    this.rows = filas.slice(1).map((fila, index) => {
-      const cantidadProducto = parseFloat(fila[3]) || 0;
-      const valor_unitario = parseFloat(fila[4]) || 0;
-      const codigoImpuestoCargo = parseFloat(fila[5]) || 0;
-      const valorReteica = parseFloat(fila[9]) || 0;
-      const valor_retencion = parseFloat(fila[7]) || 0;
-
-      return {
-        nombre: fila[0],
-        identificacion: fila[1],
-        codigo_producto: fila[2],
-        cantidadProducto: cantidadProducto,
-        valor_unitario: valor_unitario,
-        codigoImpuestoCargo: codigoImpuestoCargo,
-        valor_retencion: valor_retencion,
-        valorReteica: valorReteica,
-        fecha_vencimiento: fila[11],
-        fecha_elaboracion: fila[12],
-        anidar: fila[13] || '',
-        total: this.calcularTotal(cantidadProducto, valor_unitario, codigoImpuestoCargo, valorReteica, valor_retencion),
-      };
-    });
-  };
-
-  reader.onerror = (error) => {
-
-  };
-
-  reader.readAsText(archivo);
-},
-    enviarFacturasAnidadas() {
-      // Lógica para enviar facturas anidadas
+    async enviarFacturasAnidadas() {
+      if (this.rows.length === 0) {
+        alert("No hay datos anidados para enviar")
+      }
     },
 
     async enviarFacturaSimples() {
-  if (this.rows.length === 0) {
-    alert("No hay datos para enviar. Por favor, carga un archivo CSV primero.");
-    return;
-  }
-
-  try {
-    const responses = await Promise.all(
-      this.rows.map(async (factura, index) => {
-        const datosFactura = {
-          nombre: factura.nombre,
-          identification: factura.identificacion,
-          codigo_producto: factura.codigo_producto,
-          cantidadProducto: factura.cantidadProducto,
-          valor_unitario: factura.valor_unitario,
-          codigoImpuestoCargo: factura.codigoImpuestoCargo,
-          valor_retencion: factura.valor_retencion,
-          valorReteica: factura.valorReteica,
-          fecha_vencimiento: factura.fecha_vencimiento,
-          fecha_elaboracion: factura.fecha_elaboracion,
-          anidar: factura.anidar,
-          total: factura.total,
-        };
-
-        console.log(`Enviando factura ${index + 1}:`, datosFactura);
-
-        try {
-          return await facturaStore.enviarFactura(datosFactura);
-        } catch (error) {
-          console.error(`Error en enviarFactura para factura ${index + 1}:`, error);
-          return { success: false, error: error.message };
-        }
-      })
-    );
-
-    responses.forEach((response, index) => {
-      if (response.success) {
-        console.log(`Factura ${index + 1} enviada exitosamente:`, response);
-      } else {
-        console.error(`Error al enviar factura ${index + 1}:`, response.error || "Error desconocido");
-        alert(`Error al enviar la factura ${index + 1}: ${response.error || "Error desconocido"}`);
+      if (this.rows.length === 0) {
+        alert("No hay datos para enviar. Por favor, carga un archivo CSV primero.");
+        return;
       }
-    });
-  } catch (error) {
-    console.error("Error global al enviar las facturas:", error);
-    alert("Ocurrió un error al enviar las facturas. Por favor, revisa la consola para más detalles.");
-  }
-}
-,
-    procesarDatos() {
-      // Lógica para procesar los datos
+
+      try {
+        const responses = await Promise.all(
+          this.rows.map(async (factura, index) => {
+            const datosFactura = {
+              nombre: factura.nombre,
+              identification: factura.identificacion,
+              codigo_producto: factura.codigo_producto,
+              cantidadProducto: factura.cantidadProducto,
+              valor_unitario: factura.valor_unitario,
+              codigoImpuestoCargo: factura.codigoImpuestoCargo,
+              valor_retencion: factura.valor_retencion,
+              valorReteica: factura.valorReteica,
+              fecha_vencimiento: factura.fecha_vencimiento,
+              fecha_elaboracion: factura.fecha_elaboracion,
+              anidar: factura.anidar,
+              total: factura.total,
+            };
+
+            console.log(`Enviando factura ${index + 1}:`, datosFactura);
+
+            try {
+              return await facturaStore.enviarFactura(datosFactura);
+            } catch (error) {
+              console.error(`Error en enviarFactura para factura ${index + 1}:`, error);
+              return { success: false, error: error.message };
+            }
+          })
+        );
+
+        responses.forEach((response, index) => {
+          if (response.success) {
+            console.log(`Factura ${index + 1} enviada exitosamente:`, response);
+          } else {
+            console.error(`Error al enviar factura ${index + 1}:`, response.error || "Error desconocido");
+            alert(`Error al enviar la factura ${index + 1}: ${response.error || "Error desconocido"}`);
+          }
+        });
+      } catch (error) {
+        console.error("Error global al enviar las facturas:", error);
+        alert("Ocurrió un error al enviar las facturas. Por favor, revisa la consola para más detalles.");
+      }
+    }
+    ,
+
+    limpiarBaseDeDatos() {
+      // Vaciar la tabla
+      this.rows = [];
+      // Puedes agregar más lógica aquí si es necesario, como mostrar un mensaje de confirmación
+      alert('La base de datos ha sido limpiada.');
     },
-  limpiarBaseDeDatos() {
-    // Vaciar la tabla
-    this.rows = [];
-    // Puedes agregar más lógica aquí si es necesario, como mostrar un mensaje de confirmación
-    alert('La base de datos ha sido limpiada.');
-  },
     imprimirTicket(factura) {
       const doc = new jsPDF({
         orientation: "portrait",
@@ -352,8 +441,6 @@ export default {
       }
 
       // Añadir el contenido de tiempo debajo de los puntos
-
-
       const tiempo = [
         "Inicio de período",
         "Fecha de suspensión",
@@ -497,11 +584,12 @@ export default {
         factura.valorReteica,
         factura.valor_retencion
       );
-
       factura.subtotal = this.calcularSubtotal(
         factura.cantidadProducto,
         factura.valor_unitario
       )
+
+      doc.text(` ${factura.identificacion}`, offsetX - 55, offsetY + 13);
       doc.text(` ${factura.identificacion}`, offsetX - 55, offsetY + 13);
       doc.text(` ${factura.direccion}`, offsetX + 15, offsetY + 13);
       doc.text(` ${factura.correo}`, offsetX - 65, offsetY + 21);
@@ -509,14 +597,9 @@ export default {
       doc.text(` ${factura.codigo_producto}`, offsetX - 75, offsetY + 53);
       doc.text(` ${factura.cantidadProducto}`, offsetX - 43, offsetY + 53);
       doc.text(` ${factura.valor_unitario}`, offsetX - 29, offsetY + 53);
-      const impuestoImprimir = factura.codigoImpuestoCargo === 3 ? 19 : factura.codigoImpuestoCargo;
-      doc.text(` ${impuestoImprimir}`, offsetX - 15, offsetY + 53); //
-      // doc.text(` ${factura.codigoImpuestoCargo}`, offsetX - 15, offsetY + 53);
+      const impuestoImprimir = factura.codigoImpuestoCargo === 3 ? 19 : factura.codigoImpuestoCargo; doc.text(` ${impuestoImprimir}`, offsetX - 15, offsetY + 53); //
       doc.text(` ${factura.valor_retencion}`, offsetX - 4.5, offsetY + 53);
-      const valorReteicaFormateado = factura.valorReteica || 0;
-      doc.text(` ${valorReteicaFormateado}`, offsetX + 10, offsetY + 53);
-      // doc.text(` ${factura.total}`, offsetX + 29, offsetY + 53); //total 
-      // doc.text(` ${factura.total}`, offsetX + 29, offsetY + 53); //subtotal 
+      const valorReteicaFormateado = factura.valorReteica || 0; doc.text(` ${valorReteicaFormateado}`, offsetX + 10, offsetY + 53);
       doc.text(` ${factura.total}`, offsetX + 29, offsetY + 97); //total inferior 
       doc.text(` ${factura.valor_unitario}`, offsetX + 29, offsetY + 75);
       doc.text(` ${factura.codigoImpuestoCargo}`, offsetX + 30, offsetY + 80); //
@@ -524,27 +607,16 @@ export default {
       doc.text(` ${factura.valorReteica}`, offsetX + 30, offsetY + 92); //
       doc.text(` ${factura.identificacion}`, offsetX - 55, offsetY + 151); // tirilla
       doc.text(` ${factura.fecha_elaboracion}`, offsetX + 12, offsetY + 151); // tirilla
-
-      const subtotal = Number(factura.subtotal).toLocaleString('es-Es');
-      doc.text(`${subtotal}`, offsetX + 29, offsetY + 53);
-      // Formatear el total para que muestre los puntos de mil
-      const totalFormateado = Number(factura.total).toLocaleString('es-ES');
-      doc.text(`$${totalFormateado}`, offsetX + 15, offsetY + 141); // tirilla
-
+      const subtotal = Number(factura.subtotal).toLocaleString('es-Es'); doc.text(`${subtotal}`, offsetX + 29, offsetY + 53);
+      const totalFormateado = Number(factura.total).toLocaleString('es-ES'); doc.text(`$${totalFormateado}`, offsetX + 15, offsetY + 141); // tirilla
       function limitarCaracteres(texto, limiteCaracteres) {
         if (texto.length > limiteCaracteres) {
           return texto.slice(0, limiteCaracteres) + '...';
         }
         return texto;
       }
-
-      const nombredetalleclien = limitarCaracteres(factura.nombre, 63);
-      doc.text(` ${nombredetalleclien}`, offsetX - 64, offsetY + 5);
-
-      const nombreLimitado = limitarCaracteres(factura.nombre, 25);
-      doc.text(` ${nombreLimitado}`, offsetX - 70, offsetY + 141); // tirilla 
-
-
+      const nombredetalleclien = limitarCaracteres(factura.nombre, 63); doc.text(` ${nombredetalleclien}`, offsetX - 64, offsetY + 5);
+      const nombreLimitado = limitarCaracteres(factura.nombre, 25); doc.text(` ${nombreLimitado}`, offsetX - 70, offsetY + 141); // tirilla 
 
       // doc.save('ticket.pdf');
       const pdfBlob = doc.output('blob');
@@ -742,9 +814,5 @@ h1 {
   border: none;
   cursor: pointer;
   background: -webkit-linear-gradient(bottom, #b95b5b, #d34646);
-}
-
-.superior {
-  width: 120%
 }
 </style>
