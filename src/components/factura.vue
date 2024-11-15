@@ -69,6 +69,7 @@ import { createPinia } from 'pinia';
 const pinia = createPinia();
 const facturaStore = useFacturaStore(pinia);
 const resultado = ref(null);
+const facturasAnidadas = ref([]);
 
 // import factura from "../stores/factura.js"
 export default {
@@ -104,77 +105,116 @@ export default {
       this.$refs.fileInput.click();
     },
 
-    // procesarArchivo(datos) {
-    //   const archivo = datos.target.files[0];
-    //   if (archivo) {
-    //     this.nombreArchivo = archivo.name;
+    procesarArchivo(datos) {
+      const archivo = datos.target.files[0];
+      if (archivo) {
+        this.nombreArchivo = archivo.name;
 
-    //     const reader = new FileReader();
-    //     reader.onload = (e) => {
-    //       const contenido = e.target.result;
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          const contenido = e.target.result;
 
-    //       // Dividir en filas
-    //       const filas = contenido.split('\n');
-    //       const encabezados = filas[0].split(';'); // Primera fila como encabezados
-    //       const datos = [];
+          // Dividir en filas
+          const filas = contenido.split('\n');
+          const encabezados = filas[0].split(';'); // Primera fila como encabezados
+          const datos = [];
 
-    //       // Convertir filas en objetos usando encabezados
-    //       for (let i = 1; i < filas.length; i++) {
-    //         const columnas = filas[i].split(';');
-    //         const objeto = {};
+          // Convertir filas en objetos usando encabezados
+          for (let i = 1; i < filas.length; i++) {
+            const columnas = filas[i].split(';');
+            const objeto = {};
 
-    //         encabezados.forEach((header, index) => {
-    //           objeto[header.trim()] = columnas[index]?.trim();
-    //         });
+            encabezados.forEach((header, index) => {
+              objeto[header.trim()] = columnas[index]?.trim();
+            });
+            datos.push(objeto);
+          }
 
-    //         datos.push(objeto);
-    //       }
+          // Crear listas separadas para facturas simples y anidadas
+          const facturasSimples = [];
+          const facturasAnidadas = [];
 
-    //       // Crear un objeto para almacenar las facturas con identificación única
-    //       const facturasUnicas = {};
+          const facturasUnicas = {};
 
-    //       datos.forEach((dato) => {
-    //         const identificacion = dato["Identificación tercero"]?.trim();  // Eliminar espacios en blanco
+          datos.forEach((dato) => {
+            const identificacion = dato["Identificación tercero"]?.trim();  // Eliminar espacios en blanco
 
-    //         // Crear un objeto que contenga solo los datos necesarios para datos extra
-    //         const datosFiltrados = {
-    //           "Código producto": dato["Código producto"],
-    //           "Cantidad producto": dato["Cantidad producto"],
-    //           "Valor unitario": dato["Valor unitario"],
-    //           "Código impuesto cargo": dato["Código impuesto cargo"],
-    //           "Valor Retencion": dato["Valor Retencion"],
-    //           "Valor Reteica": dato["Valor Reteica"],
+            // Crear un objeto que contenga solo los datos necesarios para datos extra
+            const datosFiltrados = {
+              "Código producto": dato["Código producto"],
+              "Cantidad producto": dato["Cantidad producto"],
+              "Valor unitario": dato["Valor unitario"],
+              "Código impuesto cargo": dato["Código impuesto cargo"],
+              "Valor Retencion": dato["Valor Retencion"],
+              "Valor Reteica": dato["Valor Reteica"],
+            };
 
-    //         };
+            if (!facturasUnicas[identificacion]) {
+              // Si no existe en el objeto, agregar la factura inicial
+              facturasUnicas[identificacion] = { ...dato, datosExtra: [] };
+            } else {
+              // Si ya existe, agregar solo los datos necesarios a datosExtra
+              facturasUnicas[identificacion].datosExtra.push(datosFiltrados);
+            }
+          });
 
-    //         if (!facturasUnicas[identificacion]) {
-    //           // Si no existe en el objeto, agregar la factura inicial
-    //           facturasUnicas[identificacion] = { ...dato, datosExtra: [] };
-    //           console.log("Agregado como nueva factura:", facturasUnicas[identificacion]);
-    //         } else {
-    //           // Si ya existe, agregar solo los datos necesarios a datosExtra
-    //           facturasUnicas[identificacion].datosExtra.push(datosFiltrados);
-    //           console.log("Datos adicionales agregados a factura existente:", facturasUnicas[identificacion]);
-    //         }
-    //       });
+          // Dividir las facturas en simples y anidadas
+          Object.values(facturasUnicas).forEach((factura) => {
+            if (factura.datosExtra.length > 0) {
+              facturasAnidadas.push(factura);
+            } else {
+              facturasSimples.push(factura);
+            }
+          });
 
-    //       // Convertir el objeto de facturas únicas en un array para poder subirlo a la tabla
-    //       const datosParaTabla = Object.values(facturasUnicas);
-    //       console.log('imprimir', datosParaTabla)
-    //       // Lógica para subir datosParaTabla a la tabla
-    //       this.subirATabla(datosParaTabla);
-    //     };
+          // Subir ambas listas a sus correspondientes estados o tablas
+          this.facturasSimples = facturasSimples; // Guardar las facturas simples
+          this.facturasAnidadas = facturasAnidadas; // Guardar las facturas anidadas
 
-    //     reader.readAsText(archivo);
-    //   } else {
-    //     this.nombreArchivo = '';
-    //   }
-    // },
+          console.log("Facturas Simples:", this.facturasSimples);
+          console.log("Facturas Anidadas:", this.facturasAnidadas);
+        };
 
-    // subirATabla(datos) {
-    //   // Implementación para subir los datos a la tabla en tu aplicación.
-    //   this.datosTabla = datos;
-    // },
+        reader.readAsText(archivo);
+      } else {
+        this.nombreArchivo = '';
+      }
+    },
+
+
+    subirATabla(datos) {
+      // Implementación para subir los datos a la tabla en tu aplicación.
+      this.datosTabla = datos;
+    },
+
+    calcularTotal(cantidadProducto, valor_unitario, codigoImpuestoCargo, valorReteica, valor_retencion) {
+      // Asegurarte de que todos los valores son números válidos
+      cantidadProducto = isNaN(cantidadProducto) ? 0 : parseFloat(cantidadProducto);
+      valor_unitario = isNaN(valor_unitario) ? 0 : parseFloat(valor_unitario);
+      codigoImpuestoCargo = isNaN(codigoImpuestoCargo) ? 0 : parseFloat(codigoImpuestoCargo);
+      valorReteica = isNaN(valorReteica) ? 0 : parseFloat(valorReteica);
+      valor_retencion = isNaN(valor_retencion) ? 0 : parseFloat(valor_retencion);
+
+      const valorBruto = cantidadProducto * valor_unitario;
+      let descuento = 0;
+      // Si el código de impuesto es 3, aplicar el cálculo especial
+      if (codigoImpuestoCargo === 3) {
+        descuento = (valorBruto * 19) / 100;
+      } else {
+        descuento = (valorBruto * codigoImpuestoCargo) / 100;
+      }
+      const total = valorBruto + descuento - valorReteica - valor_retencion;
+      return total.toFixed(0);  // Retornar sin decimales
+    },
+
+    calcularSubtotal(cantidadProducto, valor_unitario) {
+      // Asegurarte de que ambos valores sean números válidos
+      cantidadProducto = isNaN(cantidadProducto) ? 0 : parseFloat(cantidadProducto);
+      valor_unitario = isNaN(valor_unitario) ? 0 : parseFloat(valor_unitario);
+
+      const subtotal = cantidadProducto * valor_unitario;
+      return subtotal.toFixed(0);  // Retornar sin decimales
+    },
 
     async subirArchivo() {
       const archivo = this.$refs.fileInput.files[0];
@@ -206,16 +246,11 @@ export default {
           const fecha_vencimiento = fila[11];
           const fecha_elaboracion = fila[12];
           const anidar = fila[13] || '';
+          const datosExtra = fila[14] ? fila[14].split(",") : []; // Asegura que datosExtra sea un array si tiene valores
 
           // Si ya existe una factura con esta 'identificacion', sumamos los valores
           if (facturasAgrupadas[identificacion]) {
-            // Sumamos las cantidades y valores
-            // facturasAgrupadas[identificacion].cantidadProducto += cantidadProducto;
-            // facturasAgrupadas[identificacion].valor_unitario += valor_unitario;
-            // facturasAgrupadas[identificacion].codigoImpuestoCargo += codigoImpuestoCargo;
-            // facturasAgrupadas[identificacion].valor_retencion += valor_retencion;
-            // facturasAgrupadas[identificacion].valorReteica += valorReteica;
-            // Actualizamos otros campos si es necesario, por ejemplo 'fecha_vencimiento'
+            // Aquí podrías combinar los datos de ser necesario
           } else {
             // Si es una factura nueva, la agregamos al objeto
             facturasAgrupadas[identificacion] = {
@@ -231,10 +266,10 @@ export default {
               fecha_elaboracion,
               anidar,
               total: this.calcularTotal(cantidadProducto, valor_unitario, codigoImpuestoCargo, valorReteica, valor_retencion),
+              datosExtra,  // Incluye datosExtra en cada factura
             };
           }
         });
-
         // Convertir el objeto de facturas agrupadas en un array para usarlo en la tabla
         this.rows = Object.values(facturasAgrupadas);
       };
@@ -246,49 +281,21 @@ export default {
       reader.readAsText(archivo);
     },
 
-    calcularTotal(cantidadProducto, valor_unitario, codigoImpuestoCargo, valorReteica, valor_retencion) {
-      // Asegurarte de que todos los valores son números válidos
-      cantidadProducto = isNaN(cantidadProducto) ? 0 : parseFloat(cantidadProducto);
-      valor_unitario = isNaN(valor_unitario) ? 0 : parseFloat(valor_unitario);
-      codigoImpuestoCargo = isNaN(codigoImpuestoCargo) ? 0 : parseFloat(codigoImpuestoCargo);
-      valorReteica = isNaN(valorReteica) ? 0 : parseFloat(valorReteica);
-      valor_retencion = isNaN(valor_retencion) ? 0 : parseFloat(valor_retencion);
-
-      const valorBruto = cantidadProducto * valor_unitario;
-      let descuento = 0;
-      // Si el código de impuesto es 3, aplicar el cálculo especial
-      if (codigoImpuestoCargo === 3) {
-        descuento = (valorBruto * 19) / 100;
-      } else {
-        descuento = (valorBruto * codigoImpuestoCargo) / 100;
-      }
-      const total = valorBruto + descuento - valorReteica - valor_retencion;
-      return total.toFixed(0);  // Retornar sin decimales
-    },
-
-    calcularSubtotal(cantidadProducto, valor_unitario) {
-      // Asegurarte de que ambos valores sean números válidos
-      cantidadProducto = isNaN(cantidadProducto) ? 0 : parseFloat(cantidadProducto);
-      valor_unitario = isNaN(valor_unitario) ? 0 : parseFloat(valor_unitario);
-
-      const subtotal = cantidadProducto * valor_unitario;
-      return subtotal.toFixed(0);  // Retornar sin decimales
-    },
     async enviarFacturasAnidadas() {
-      if (this.rows.length === 0) {
-        alert("No hay datos anidados para enviar")
-      }
+      
     },
 
     async enviarFacturaSimples() {
-      if (this.rows.length === 0) {
-        alert("No hay datos para enviar. Por favor, carga un archivo CSV primero.");
+      const facturasSimples = this.rows.filter(factura => !factura.datosExtra || factura.datosExtra.length === 0);
+
+      if (facturasSimples.length === 0) {
+        alert("No hay facturas simples para enviar. Por favor, carga un archivo CSV primero.");
         return;
       }
 
       try {
         const responses = await Promise.all(
-          this.rows.map(async (factura, index) => {
+          facturasSimples.map(async (factura, index) => {
             const datosFactura = {
               nombre: factura.nombre,
               identification: factura.identificacion,
@@ -304,12 +311,12 @@ export default {
               total: factura.total,
             };
 
-            console.log(`Enviando factura ${index + 1}:`, datosFactura);
+            console.log(`Enviando factura simple ${index + 1}:`, datosFactura);
 
             try {
               return await facturaStore.enviarFactura(datosFactura);
             } catch (error) {
-              console.error(`Error en enviarFactura para factura ${index + 1}:`, error);
+              console.error(`Error en enviarFactura para factura simple ${index + 1}:`, error);
               return { success: false, error: error.message };
             }
           })
@@ -317,18 +324,18 @@ export default {
 
         responses.forEach((response, index) => {
           if (response.success) {
-            console.log(`Factura ${index + 1} enviada exitosamente:`, response);
+            console.log(`Factura simple ${index + 1} enviada exitosamente:`, response);
           } else {
-            console.error(`Error al enviar factura ${index + 1}:`, response.error || "Error desconocido");
-            alert(`Error al enviar la factura ${index + 1}: ${response.error || "Error desconocido"}`);
+            console.error(`Error al enviar factura simple ${index + 1}:`, response.error || "Error desconocido");
+            alert(`Error al enviar la factura simple ${index + 1}: ${response.error || "Error desconocido"}`);
           }
         });
       } catch (error) {
-        console.error("Error global al enviar las facturas:", error);
-        alert("Ocurrió un error al enviar las facturas. Por favor, revisa la consola para más detalles.");
+        console.error("Error global al enviar las facturas simples:", error);
+        alert("Ocurrió un error al enviar las facturas simples. Por favor, revisa la consola para más detalles.");
       }
-    }
-    ,
+    },
+
 
     limpiarBaseDeDatos() {
       // Vaciar la tabla
@@ -336,6 +343,7 @@ export default {
       // Puedes agregar más lógica aquí si es necesario, como mostrar un mensaje de confirmación
       alert('La base de datos ha sido limpiada.');
     },
+
     imprimirTicket(factura) {
       const doc = new jsPDF({
         orientation: "portrait",
@@ -589,6 +597,13 @@ export default {
         factura.valor_unitario
       )
 
+      function limitarCaracteres(texto, limiteCaracteres) {
+        if (texto.length > limiteCaracteres) {
+          return texto.slice(0, limiteCaracteres) + '...';
+        }
+        return texto;
+      }
+
       doc.text(` ${factura.identificacion}`, offsetX - 55, offsetY + 13);
       doc.text(` ${factura.identificacion}`, offsetX - 55, offsetY + 13);
       doc.text(` ${factura.direccion}`, offsetX + 15, offsetY + 13);
@@ -609,14 +624,9 @@ export default {
       doc.text(` ${factura.fecha_elaboracion}`, offsetX + 12, offsetY + 151); // tirilla
       const subtotal = Number(factura.subtotal).toLocaleString('es-Es'); doc.text(`${subtotal}`, offsetX + 29, offsetY + 53);
       const totalFormateado = Number(factura.total).toLocaleString('es-ES'); doc.text(`$${totalFormateado}`, offsetX + 15, offsetY + 141); // tirilla
-      function limitarCaracteres(texto, limiteCaracteres) {
-        if (texto.length > limiteCaracteres) {
-          return texto.slice(0, limiteCaracteres) + '...';
-        }
-        return texto;
-      }
       const nombredetalleclien = limitarCaracteres(factura.nombre, 63); doc.text(` ${nombredetalleclien}`, offsetX - 64, offsetY + 5);
       const nombreLimitado = limitarCaracteres(factura.nombre, 25); doc.text(` ${nombreLimitado}`, offsetX - 70, offsetY + 141); // tirilla 
+
 
       // doc.save('ticket.pdf');
       const pdfBlob = doc.output('blob');
