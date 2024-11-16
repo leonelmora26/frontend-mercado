@@ -33,7 +33,8 @@ export const useFacturaStore = defineStore('factura', {
         facturaData.dueDate = facturaData.fecha_vencimiento || '';
 
         // Paso 2: Obtener el item_id
-        const item = await this.obtenerItem(facturaData.codigo_producto);
+        const item = await this.obtenerItem(facturaData.items[0].codigo);
+        console.log('factura data',facturaData)
         if (!item) throw new Error("Error: No se encontró el ítem en Alegra.");
 
         facturaData.items = [{
@@ -79,6 +80,7 @@ export const useFacturaStore = defineStore('factura', {
         const data = await response.json();
         return data.find(i => i.reference === codigoProducto) || null;
       } catch (error) {
+        console.log("Respuesta de la API:", data);
         console.error("Error al obtener item_id:", error);
         return null;
       }
