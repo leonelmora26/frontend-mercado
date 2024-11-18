@@ -33,19 +33,24 @@ export const useFacturaStore = defineStore('factura', {
         facturaData.dueDate = facturaData.fecha_vencimiento || '';
 
         // Paso 2: Obtener el item_id
-        const item = await this.obtenerItem(facturaData.items[0].codigo);
-        console.log('factura data',facturaData)
-        if (!item) throw new Error("Error: No se encontró el ítem en Alegra.");
-
-        facturaData.items = [{
-          id: item.id,
-          name: item.name,
-          price: item.price[0]?.price || null,
-          quantity: facturaData.cantidadProducto || 1,
-          description: facturaData.codigo_producto,
-          observations: facturaData.observations,
-          discount: facturaData.discount || null,
-        }];
+        facturaData.items = await Promise.all(
+          facturaData.items.map(async (item) => {
+            const itemData = await this.obtenerItem(item.codigo);
+            if (!itemData) {
+              throw new Error(`Error: No se encontró el ítem con código ${item.codigo}`);
+            }
+            return {
+              id: itemData.id,
+              name: itemData.name,
+              price: item.price || itemData.price[0]?.price || null,
+              quantity: item.quantity || 1,
+              description: item.description || '',
+              observations: item.observations || '',
+              discount: item.discount || null,
+            };
+          })
+        );
+        
 
         // Paso 3: Preparar y enviar la factura
         const preparedFactura = this.prepararFactura(facturaData);

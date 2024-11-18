@@ -188,10 +188,10 @@ export default {
           this.facturasSimples = facturasSimples; // Guardar las facturas simples
           this.facturasAnidadas = facturasAnidadas; // Guardar las facturas anidadas
           this.rows = [...this.facturasSimples, ...this.facturasAnidadas];
-console.log("Rows actualizados con simples y anidadas:", this.rows);
+          console.log("Rows actualizados con simples y anidadas:", this.rows);
           console.log("Facturas Simples:", this.facturasSimples);
           console.log("Facturas Anidadas:", this.facturasAnidadas);
-          
+
         };
 
         reader.readAsText(archivo);
@@ -266,28 +266,28 @@ console.log("Rows actualizados con simples y anidadas:", this.rows);
           const anidar = fila[13] || '';
 
           // Si ya existe una factura con esta 'identificacion', sumamos los valores
-         if (facturasAgrupadas[identificacion]) {
-  // Si ya existe, actualizamos los valores
-  facturasAgrupadas[identificacion].cantidadProducto += cantidadProducto;
-  facturasAgrupadas[identificacion].valor_unitario += valor_unitario; // Dependiendo de la lógica que necesites
-  facturasAgrupadas[identificacion].total += this.calcularTotal(cantidadProducto, valor_unitario, codigoImpuestoCargo, valorReteica, valor_retencion);
-} else {
-  // Si es una factura nueva, la agregamos
-  facturasAgrupadas[identificacion] = {
-    nombre,
-    identificacion,
-    codigo_producto,
-    cantidadProducto,
-    valor_unitario,
-    codigoImpuestoCargo,
-    valor_retencion,
-    valorReteica,
-    fecha_vencimiento,
-    fecha_elaboracion,
-    anidar,
-    total: this.calcularTotal(cantidadProducto, valor_unitario, codigoImpuestoCargo, valorReteica, valor_retencion),
-  };
-}
+          if (facturasAgrupadas[identificacion]) {
+            // Si ya existe, actualizamos los valores
+            facturasAgrupadas[identificacion].cantidadProducto += cantidadProducto;
+            facturasAgrupadas[identificacion].valor_unitario += valor_unitario; // Dependiendo de la lógica que necesites
+            facturasAgrupadas[identificacion].total += this.calcularTotal(cantidadProducto, valor_unitario, codigoImpuestoCargo, valorReteica, valor_retencion);
+          } else {
+            // Si es una factura nueva, la agregamos
+            facturasAgrupadas[identificacion] = {
+              nombre,
+              identificacion,
+              codigo_producto,
+              cantidadProducto,
+              valor_unitario,
+              codigoImpuestoCargo,
+              valor_retencion,
+              valorReteica,
+              fecha_vencimiento,
+              fecha_elaboracion,
+              anidar,
+              total: this.calcularTotal(cantidadProducto, valor_unitario, codigoImpuestoCargo, valorReteica, valor_retencion),
+            };
+          }
 
         });
         // Convertir el objeto de facturas agrupadas en un array para usarlo en la tabla
@@ -303,7 +303,6 @@ console.log("Rows actualizados con simples y anidadas:", this.rows);
 
     async enviarFacturaSimples() {
       const facturasSimples = this.rows.filter(factura => !factura.items || factura.items.length === 0); // Ahora usamos 'items' en lugar de 'datosExtra'
-
       if (facturasSimples.length === 0) {
         alert("No hay facturas simples para enviar. Por favor, carga un archivo CSV primero.");
         return;
@@ -357,80 +356,75 @@ console.log("Rows actualizados con simples y anidadas:", this.rows);
     },
 
     async enviarFacturasAnidadas() {
-      console.log("Contenido de this.rows antes del filtro:", this.rows);
+  console.log("Contenido de this.facturasAnidadas:", this.facturasAnidadas);
 
-      const facturasAnidadas = this.rows.filter(factura => factura.items && factura.items.length > 1);
-      console.log("Facturas Anidadas Detectadas:", facturasAnidadas);
-      console.log("Longitud de Facturas Anidadas:", facturasAnidadas.length);
-      if (facturasAnidadas.length === 0) {
-        alert("No hay facturas anidadas para enviar. Por favor, verifica el archivo CSV.");
-        return;
-      }
+  if (!this.facturasAnidadas || this.facturasAnidadas.length === 0) {
+    alert("No hay facturas anidadas para enviar. Por favor, verifica el archivo CSV.");
+    return;
+  }
 
-      try {
-        const responses = await Promise.all(
-          facturasAnidadas.map(async (factura, index) => {
-            try {
-              console.log(`Procesando factura anidada ${index + 1}:`, factura);
+  try {
+    const responses = await Promise.all(
+      this.facturasAnidadas.map(async (factura, index) => {
+        try {
+          console.log(`Procesando factura anidada ${index + 1}:`, factura);
 
-              // Procesar cada ítem para obtener el `item_id` desde Alegra
-              const items = await Promise.all(
-                factura.items.map(async (item) => {
-                  const itemData = await facturaStore.obtenerItem(item.codigo); // Buscar el ítem en Alegra
+          // Procesar cada ítem para obtener el `item_id` desde Alegra
+          const items = await Promise.all(
+            factura.items.map(async (item) => {
+              // Verificar que el item tiene codigo_producto
+              console.log('Item antes de procesar:', item); // Revisa que el código esté presente
+              const itemData = await facturaStore.obtenerItem(item.codigo_producto); // Buscar el ítem en Alegra
 
-                  if (!itemData) {
-                    throw new Error(`No se encontró el ítem con código: ${item.codigo}`);
-                  }
+              if (!itemData) {
+                throw new Error(`No se encontró el ítem con código: ${item.codigo_producto}`);
+              }
 
-                  return {
-                    id: itemData.id,
-                    name: itemData.name,
-                    price: item.price || itemData.price[0]?.price || 0,
-                    quantity: item.quantity || 1,
-                    unit: item.unit || "service",
-                    tax: item.tax || [],
-                    description: item.descripcion || item.codigo,
-                    observations: item.observaciones || "",
-                    discount: item.descuento || 0,
-                  };
-                })
-              );
-
-              // Preparar los datos de la factura anidada
-              const datosFactura = {
-                identification: factura.identificacion,
-                fecha_vencimiento: factura.fecha_vencimiento,
-                fecha_elaboracion: factura.fecha_elaboracion,
-                nombre: factura.nombre,
-                tax: factura.tax,
-                total: factura.total,
-                items, // Incluir todos los ítems procesados
+              return {
+                codigo: item.codigo_producto, // Aquí debería estar el código del producto
+                price: parseFloat(item.price || 0),
+                quantity: parseInt(item.quantity || 0, 10),
+                unit: item.unit || "service", // Ajusta según tu caso
+                tax: item.tax || [],
+                total: parseFloat(item.price || 0) * parseInt(item.quantity || 0, 10),
               };
+            })
+          );
+          // Preparar los datos de la factura anidada
+          const datosFactura = {
+            identification: factura.client?.identification,
+            fecha_vencimiento: factura.dueDate,
+            fecha_elaboracion: factura.date,
+            nombre: factura.client?.name,
+            tax: factura.tax || 0,
+            total: factura.total || 0,
+            items, // Incluir todos los ítems procesados
+          };
 
-              console.log(`Enviando factura anidada ${index + 1}:`, datosFactura);
+          console.log(`Enviando factura anidada ${index + 1}:`, datosFactura);
 
-              return await facturaStore.enviarFactura(datosFactura);
-            } catch (error) {
-              console.error(`Error en factura anidada ${index + 1}:`, error.message);
-              return { success: false, error: error.message };
-            }
-          })
-        );
+            return await facturaStore.enviarFactura(datosFactura);
+        } catch (error) {
+          console.error(`Error en factura anidada ${index + 1}:`, error.message);
+          return { success: false, error: error.message };
+        }
+      })
+    );
 
-        // Manejar las respuestas de las facturas anidadas
-        responses.forEach((response, index) => {
-          if (response.success) {
-            console.log(`Factura anidada ${index + 1} enviada exitosamente.`);
-          } else {
-            console.error(`Error al enviar factura anidada ${index + 1}:`, response.error);
-            alert(`Error al enviar la factura anidada ${index + 1}: ${response.error}`);
-          }
-        });
-      } catch (error) {
-        console.error("Error global al enviar facturas anidadas:", error);
-        alert("Ocurrió un error global al enviar las facturas anidadas.");
+    // Manejar las respuestas de las facturas anidadas
+    responses.forEach((response, index) => {
+      if (response.success) {
+        console.log(`Factura anidada ${index + 1} enviada exitosamente.`);
+      } else {
+        console.error(`Error al enviar factura anidada ${index + 1}:`, response.error);
+        alert(`Error al enviar la factura anidada ${index + 1}: ${response.error}`);
       }
-    },
+    });
+  } catch (error) {
+    console.error("Error global al enviar facturas anidadas:", error);
+    alert("Ocurrió un error global al enviar las facturas anidadas.");
+  }
+},
 
 
     limpiarBaseDeDatos() {
