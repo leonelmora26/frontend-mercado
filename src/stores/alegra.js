@@ -10,6 +10,7 @@ export const useFacturaStore = defineStore('factura', {
   actions: {
     // Función principal para añadir facturas a la cola y procesarlas
     async enviarFactura(facturaData) {
+      console.log('Factura recibida para enviar:', facturaData);
       this.facturasPendientes.push(facturaData); // Añadir factura a la cola
       await this.procesarCola(); // Intentar procesar la cola
     },
@@ -20,10 +21,12 @@ export const useFacturaStore = defineStore('factura', {
 
       this.isSending = true;
       const facturaData = this.facturasPendientes.shift(); // Saca la primera factura en la cola
+      console.log('Procesando factura:', facturaData);
 
       try {
         // Paso 1: Obtener client_id
         const clientId = await this.obtenerClientId(facturaData.identification);
+        console.log('clientId obtenido:', clientId);
         if (!clientId) {
           throw new Error("Error: No se pudo obtener client_id para el cliente.");
         }
@@ -31,30 +34,40 @@ export const useFacturaStore = defineStore('factura', {
         facturaData.client_id = clientId;
         facturaData.date = facturaData.fecha_elaboracion || '';
         facturaData.dueDate = facturaData.fecha_vencimiento || '';
+        console.log('Factura con clientId agregado:', facturaData);
 
         // Paso 2: Obtener el item_id
         facturaData.items = await Promise.all(
           facturaData.items.map(async (item) => {
+            console.log('Procesando ítem:', item);
             const itemData = await this.obtenerItem(item.codigo);
+            console.log('Datos del ítem obtenido:', itemData);
             if (!itemData) {
               throw new Error(`Error: No se encontró el ítem con código ${item.codigo}`);
             }
-            return {
+            const processedItem = {
               id: itemData.id,
               name: itemData.name,
               price: item.price || itemData.price[0]?.price || null,
               quantity: item.quantity || 1,
               description: item.description || '',
               observations: item.observations || '',
-              discount: item.discount || null,
-            };
+              discount: item.discount || 0,
+              tax: item.tax || [], // Mantén los impuestos originales
+            };            
+            console.log('Ítem procesado:', processedItem);
+            return processedItem;
           })
         );
-        
+
+        console.log('Todos los ítems procesados:', facturaData.items);
 
         // Paso 3: Preparar y enviar la factura
         const preparedFactura = this.prepararFactura(facturaData);
+        console.log('Factura preparada para enviar:', preparedFactura);
+
         const response = await this.enviarDatosAFactura(preparedFactura);
+        console.log('Respuesta del envío de la factura:', response);
 
         this.facturaResponse = response.success
           ? { success: true, response: response.result }
@@ -66,6 +79,7 @@ export const useFacturaStore = defineStore('factura', {
       } finally {
         this.isSending = false; // Liberar el flag
         if (this.facturasPendientes.length > 0) {
+          console.log('Procesando la siguiente factura en la cola...');
           this.procesarCola(); // Llamar de nuevo para procesar la siguiente factura en la cola
         }
       }
@@ -75,6 +89,7 @@ export const useFacturaStore = defineStore('factura', {
 
     async obtenerItem(codigoProducto) {
       try {
+        console.log('Buscando ítem con código:', codigoProducto);
         const response = await fetch(`https://api.alegra.com/api/v1/items?query=${codigoProducto}`, {
           method: 'GET',
           headers: {
@@ -83,9 +98,9 @@ export const useFacturaStore = defineStore('factura', {
           },
         });
         const data = await response.json();
+        console.log('Respuesta de la API para ítem:', data);
         return data.find(i => i.reference === codigoProducto) || null;
       } catch (error) {
-        console.log("Respuesta de la API:", data);
         console.error("Error al obtener item_id:", error);
         return null;
       }
@@ -93,6 +108,7 @@ export const useFacturaStore = defineStore('factura', {
 
     async enviarDatosAFactura(preparedFactura) {
       try {
+        console.log('Enviando datos de factura a la API:', preparedFactura);
         const response = await fetch('https://api.alegra.com/api/v1/invoices', {
           method: 'POST',
           headers: {
@@ -103,6 +119,7 @@ export const useFacturaStore = defineStore('factura', {
           body: JSON.stringify(preparedFactura),
         });
         const result = await response.json();
+        console.log('Respuesta de la API al enviar factura:', result);
         if (!response.ok) {
           throw new Error(result.error || "Error desconocido al enviar la factura.");
         }
@@ -114,7 +131,7 @@ export const useFacturaStore = defineStore('factura', {
     },
 
     prepararFactura(facturaData) {
-      return {
+      const preparedFactura = {
         client: { id: facturaData.client_id },
         date: facturaData.date,
         dueDate: facturaData.dueDate,
@@ -125,10 +142,13 @@ export const useFacturaStore = defineStore('factura', {
         termsConditions: facturaData.termsConditions || 'Esta Factura se podrá cancelar en: BANCOLOMBIA en la cuenta de ahorro Numero 32200000480 OFICINA PRINCIPAL ubicada Cra 8 No 16-14',
         anotation: facturaData.anotation || 'MIKROTECK SAS. Empresa autorizada y vigilada por el MINTIC. Registro TIC 96003535',
       };
+      console.log('Factura preparada:', preparedFactura);
+      return preparedFactura;
     },
 
     async obtenerClientId(identification) {
       try {
+        console.log('Buscando clientId para identificación:', identification);
         const response = await fetch(`https://api.alegra.com/api/v1/contacts?identification=${identification}`, {
           method: 'GET',
           headers: {
@@ -137,6 +157,7 @@ export const useFacturaStore = defineStore('factura', {
           },
         });
         const data = await response.json();
+        console.log('Respuesta de la API para clientId:', data);
         return data[0]?.id || null;
       } catch (error) {
         console.error("Error al obtener client_id:", error.message);

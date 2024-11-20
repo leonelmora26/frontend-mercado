@@ -105,6 +105,35 @@ export default {
       this.$refs.fileInput.click();
     },
 
+    calcularTotal(cantidadProducto, valor_unitario, iva, valorReteica, valor_retencion) {
+      // Asegurarte de que todos los valores son números válidos
+      cantidadProducto = isNaN(cantidadProducto) ? 0 : parseFloat(cantidadProducto);
+      valor_unitario = isNaN(valor_unitario) ? 0 : parseFloat(valor_unitario);
+      iva = isNaN(iva) ? 0 : parseFloat(iva);
+      valorReteica = isNaN(valorReteica) ? 0 : parseFloat(valorReteica);
+      valor_retencion = isNaN(valor_retencion) ? 0 : parseFloat(valor_retencion);
+
+      const valorBruto = cantidadProducto * valor_unitario;
+      let descuento = 0;
+      // Si el código de impuesto es 3, aplicar el cálculo especial
+      if (iva === 3) {
+        descuento = (valorBruto * 19) / 100;
+      } else {
+        descuento = (valorBruto * iva) / 100;
+      }
+      const total = valorBruto + descuento - valorReteica - valor_retencion;
+      return total.toFixed(0);  // Retornar sin decimales
+    },
+
+    calcularSubtotal(cantidadProducto, valor_unitario) {
+      // Asegurarte de que ambos valores sean números válidos
+      cantidadProducto = isNaN(cantidadProducto) ? 0 : parseFloat(cantidadProducto);
+      valor_unitario = isNaN(valor_unitario) ? 0 : parseFloat(valor_unitario);
+
+      const subtotal = cantidadProducto * valor_unitario;
+      return subtotal.toFixed(0);  // Retornar sin decimales
+    },
+
     procesarArchivo(datos) {
       const archivo = datos.target.files[0];
       if (archivo) {
@@ -113,14 +142,13 @@ export default {
         const reader = new FileReader();
         reader.onload = (e) => {
           const contenido = e.target.result;
-          // Dividir en filas
-          const filas = contenido.split('\n');
-          const encabezados = filas[0].split(';'); // Primera fila como encabezados
+          const filas = contenido.split("\n");
+          const encabezados = filas[0].split(";"); // Primera fila como encabezados
           const datos = [];
 
           // Convertir filas en objetos usando encabezados
           for (let i = 1; i < filas.length; i++) {
-            const columnas = filas[i].split(';');
+            const columnas = filas[i].split(";");
             const objeto = {};
 
             encabezados.forEach((header, index) => {
@@ -132,22 +160,50 @@ export default {
           // Crear listas separadas para facturas simples y anidadas
           const facturasSimples = [];
           const facturasAnidadas = [];
-
           const facturasUnicas = {};
 
           datos.forEach((dato) => {
             const identificacion = dato["Identificación tercero"]?.trim(); // Identificación única del cliente
 
+            // Obtener valores desde el archivo
+            const precioUnitario = parseFloat(dato["Valor unitario"] || 0);
+            const cantidad = parseInt(dato["Cantidad producto"] || 0, 10);
+            const descuento = parseFloat(dato["Código impuesto cargo"] || 0);
+            const reteicaPorcentaje = parseFloat(dato["Reteica"] || 0);
+            const retencionPorcentaje = parseFloat(dato["Valor Retencion"] || 0);
+
+            // Calcular valor bruto
+            const valorBruto = precioUnitario * cantidad;
+            let iva = 0;
+
+            // Si el código de impuesto es 3, aplicar el cálculo especial
+            if (descuento === 3) {
+              iva = (valorBruto * 19) / 100; // Caso especial: IVA del 19%
+            } else {
+              iva = (valorBruto * descuento) / 100; // Calcular IVA general según porcentaje
+            }
+
+            // Calcular impuestos adicionales
+            const reteica = (valorBruto * reteicaPorcentaje) / 100;
+            const retencion = (retencionPorcentaje);
+
+            // Calcular total del ítem
+            const totalItem = valorBruto + iva - reteica - retencion;
+
             // Crear un objeto para el producto actual
             const producto = {
               codigo_producto: dato["Código producto"] || "Producto sin nombre",
-              price: parseFloat(dato["Valor unitario"] || 0),
-              quantity: parseInt(dato["Cantidad producto"] || 0, 10),
+              price: precioUnitario,
+              quantity: cantidad,
               unit: "service", // Ajusta según tu caso
-              tax: [], // Aquí puedes añadir los impuestos si aplica
-              total: parseFloat(dato["Valor unitario"] || 0) * parseInt(dato["Cantidad producto"] || 0, 10),
+              tax: [
+                { type: "IVA", amount: iva || 0 },
+                { type: "Retención", amount: retencion || 0 },
+                { type: "Reteica", amount: reteica || 0 },
+              ],
+              subtotal: valorBruto,
+              total: totalItem,
             };
-            console.log('producto', producto.codigo_producto)
 
             // Verificar si la factura ya existe
             if (!facturasUnicas[identificacion]) {
@@ -171,12 +227,17 @@ export default {
             }
 
             // Actualizar subtotales y totales de la factura
-            facturasUnicas[identificacion].subtotal += producto.total;
-            facturasUnicas[identificacion].total += producto.total;
+            facturasUnicas[identificacion].subtotal += producto.subtotal;
+            facturasUnicas[identificacion].tax += producto.tax.reduce((acc, t) => acc + t.amount, 0);
+            facturasUnicas[identificacion].total += totalItem;
           });
 
-          // Dividir las facturas en simples y anidadas
+          // Calcular totales de las facturas
           Object.values(facturasUnicas).forEach((factura) => {
+            // Sumar los totales de los ítems
+            factura.total = factura.items.reduce((sum, item) => sum + item.total, 0);
+
+            // Clasificar en simples o anidadas
             if (factura.items.length > 1) {
               facturasAnidadas.push(factura); // Más de un producto = factura anidada
             } else {
@@ -185,53 +246,19 @@ export default {
           });
 
           // Subir ambas listas a sus correspondientes estados o tablas
-          this.facturasSimples = facturasSimples; // Guardar las facturas simples
-          this.facturasAnidadas = facturasAnidadas; // Guardar las facturas anidadas
+          this.facturasSimples = facturasSimples;
+          this.facturasAnidadas = facturasAnidadas;
           this.rows = [...this.facturasSimples, ...this.facturasAnidadas];
+
           console.log("Rows actualizados con simples y anidadas:", this.rows);
           console.log("Facturas Simples:", this.facturasSimples);
           console.log("Facturas Anidadas:", this.facturasAnidadas);
-
         };
 
         reader.readAsText(archivo);
       } else {
-        this.nombreArchivo = '';
+        this.nombreArchivo = "";
       }
-    },
-
-    subirATabla(datos) {
-      // Implementación para subir los datos a la tabla en tu aplicación.
-      this.datosTabla = datos;
-    },
-
-    calcularTotal(cantidadProducto, valor_unitario, codigoImpuestoCargo, valorReteica, valor_retencion) {
-      // Asegurarte de que todos los valores son números válidos
-      cantidadProducto = isNaN(cantidadProducto) ? 0 : parseFloat(cantidadProducto);
-      valor_unitario = isNaN(valor_unitario) ? 0 : parseFloat(valor_unitario);
-      codigoImpuestoCargo = isNaN(codigoImpuestoCargo) ? 0 : parseFloat(codigoImpuestoCargo);
-      valorReteica = isNaN(valorReteica) ? 0 : parseFloat(valorReteica);
-      valor_retencion = isNaN(valor_retencion) ? 0 : parseFloat(valor_retencion);
-
-      const valorBruto = cantidadProducto * valor_unitario;
-      let descuento = 0;
-      // Si el código de impuesto es 3, aplicar el cálculo especial
-      if (codigoImpuestoCargo === 3) {
-        descuento = (valorBruto * 19) / 100;
-      } else {
-        descuento = (valorBruto * codigoImpuestoCargo) / 100;
-      }
-      const total = valorBruto + descuento - valorReteica - valor_retencion;
-      return total.toFixed(0);  // Retornar sin decimales
-    },
-
-    calcularSubtotal(cantidadProducto, valor_unitario) {
-      // Asegurarte de que ambos valores sean números válidos
-      cantidadProducto = isNaN(cantidadProducto) ? 0 : parseFloat(cantidadProducto);
-      valor_unitario = isNaN(valor_unitario) ? 0 : parseFloat(valor_unitario);
-
-      const subtotal = cantidadProducto * valor_unitario;
-      return subtotal.toFixed(0);  // Retornar sin decimales
     },
 
     async subirArchivo() {
@@ -254,7 +281,7 @@ export default {
         filas.slice(1).forEach((fila) => {
           const cantidadProducto = parseFloat(fila[3]) || 0;
           const valor_unitario = parseFloat(fila[4]) || 0;
-          const codigoImpuestoCargo = parseFloat(fila[5]) || 0;
+          const iva = parseFloat(fila[5]) || 0;
           const valorReteica = parseFloat(fila[9]) || 0;
           const valor_retencion = parseFloat(fila[7]) || 0;
 
@@ -270,7 +297,7 @@ export default {
             // Si ya existe, actualizamos los valores
             facturasAgrupadas[identificacion].cantidadProducto += cantidadProducto;
             facturasAgrupadas[identificacion].valor_unitario += valor_unitario; // Dependiendo de la lógica que necesites
-            facturasAgrupadas[identificacion].total += this.calcularTotal(cantidadProducto, valor_unitario, codigoImpuestoCargo, valorReteica, valor_retencion);
+            facturasAgrupadas[identificacion].total += this.calcularTotal(cantidadProducto, valor_unitario, iva, valorReteica, valor_retencion);
           } else {
             // Si es una factura nueva, la agregamos
             facturasAgrupadas[identificacion] = {
@@ -279,17 +306,18 @@ export default {
               codigo_producto,
               cantidadProducto,
               valor_unitario,
-              codigoImpuestoCargo,
+              iva,
               valor_retencion,
               valorReteica,
               fecha_vencimiento,
               fecha_elaboracion,
               anidar,
-              total: this.calcularTotal(cantidadProducto, valor_unitario, codigoImpuestoCargo, valorReteica, valor_retencion),
+              total: this.calcularTotal(cantidadProducto, valor_unitario, iva, valorReteica, valor_retencion),
             };
           }
 
         });
+        console.log('impuestos', this.rows)
         // Convertir el objeto de facturas agrupadas en un array para usarlo en la tabla
         this.rows = Object.values(facturasAgrupadas);
       };
@@ -356,75 +384,72 @@ export default {
     },
 
     async enviarFacturasAnidadas() {
-  console.log("Contenido de this.facturasAnidadas:", this.facturasAnidadas);
-
-  if (!this.facturasAnidadas || this.facturasAnidadas.length === 0) {
-    alert("No hay facturas anidadas para enviar. Por favor, verifica el archivo CSV.");
-    return;
-  }
-
-  try {
-    const responses = await Promise.all(
-      this.facturasAnidadas.map(async (factura, index) => {
-        try {
-          console.log(`Procesando factura anidada ${index + 1}:`, factura);
-
-          // Procesar cada ítem para obtener el `item_id` desde Alegra
-          const items = await Promise.all(
-            factura.items.map(async (item) => {
-              // Verificar que el item tiene codigo_producto
-              console.log('Item antes de procesar:', item); // Revisa que el código esté presente
-              const itemData = await facturaStore.obtenerItem(item.codigo_producto); // Buscar el ítem en Alegra
-
-              if (!itemData) {
-                throw new Error(`No se encontró el ítem con código: ${item.codigo_producto}`);
-              }
-
-              return {
-                codigo: item.codigo_producto, // Aquí debería estar el código del producto
-                price: parseFloat(item.price || 0),
-                quantity: parseInt(item.quantity || 0, 10),
-                unit: item.unit || "service", // Ajusta según tu caso
-                tax: item.tax || [],
-                total: parseFloat(item.price || 0) * parseInt(item.quantity || 0, 10),
-              };
-            })
-          );
-          // Preparar los datos de la factura anidada
-          const datosFactura = {
-            identification: factura.client?.identification,
-            fecha_vencimiento: factura.dueDate,
-            fecha_elaboracion: factura.date,
-            nombre: factura.client?.name,
-            tax: factura.tax || 0,
-            total: factura.total || 0,
-            items, // Incluir todos los ítems procesados
-          };
-
-          console.log(`Enviando factura anidada ${index + 1}:`, datosFactura);
-
-            return await facturaStore.enviarFactura(datosFactura);
-        } catch (error) {
-          console.error(`Error en factura anidada ${index + 1}:`, error.message);
-          return { success: false, error: error.message };
-        }
-      })
-    );
-
-    // Manejar las respuestas de las facturas anidadas
-    responses.forEach((response, index) => {
-      if (response.success) {
-        console.log(`Factura anidada ${index + 1} enviada exitosamente.`);
-      } else {
-        console.error(`Error al enviar factura anidada ${index + 1}:`, response.error);
-        alert(`Error al enviar la factura anidada ${index + 1}: ${response.error}`);
+      if (!this.facturasAnidadas || this.facturasAnidadas.length === 0) {
+        alert("No hay facturas anidadas para enviar. Por favor, verifica el archivo CSV.");
+        return;
       }
-    });
-  } catch (error) {
-    console.error("Error global al enviar facturas anidadas:", error);
-    alert("Ocurrió un error global al enviar las facturas anidadas.");
-  }
-},
+
+      try {
+        const responses = await Promise.all(
+          this.facturasAnidadas.map(async (factura, index) => {
+            try {
+              // Preparar los datos de la factura anidada
+              const datosFactura = {
+  identification: factura.client?.identification,
+  fecha_vencimiento: factura.dueDate,
+  fecha_elaboracion: factura.date,
+  nombre: factura.client?.name,
+  tax: factura.tax, // Total de impuestos de la factura
+  total: factura.total, // Total calculado de la factura
+  items: factura.items.map((item) => {
+    const tax = item.tax?.length ? item.tax : [
+      { type: "IVA", amount: (item.price * item.quantity * 0.19) || 0 },
+    ]; // Default al 19% IVA si no tiene datos
+    return {
+      codigo: item.codigo_producto,
+      price: item.price,
+      quantity: item.quantity,
+      unit: item.unit,
+      tax, // Asegura que siempre tenga impuestos
+      total: item.total || (item.price * item.quantity + tax.reduce((acc, t) => acc + t.amount, 0)),
+    };
+  }),
+};
+console.log('Factura preparada para enviar:', datosFactura);
+
+              console.log('Validando impuestos de los ítems antes del envío...');
+              factura.items.forEach((item, index) => {
+                console.log(`Ítem ${index + 1} - Código: ${item.codigo_producto}`, item.tax);
+              });
+              console.log('datos de la factura', datosFactura)
+
+              console.log(`Enviando factura anidada ${index + 1}:`, datosFactura);
+
+              // Aquí puedes enviar la factura a Alegra
+              return await facturaStore.enviarFactura(datosFactura);
+
+            } catch (error) {
+              console.error(`Error en factura anidada ${index + 1}:`, error.message);
+              return { success: false, error: error.message };
+            }
+          })
+        );
+
+        responses.forEach((response, index) => {
+          if (response) {
+            console.log(`Factura anidada ${index + 1} enviada exitosamente.`);
+          } else {
+            console.error(`Error al enviar factura anidada ${index + 1}:`, response.error);
+            alert(`Error al enviar la factura anidada ${index + 1}: ${response.error}`);
+          }
+        });
+      } catch (error) {
+        console.error("Error global al enviar facturas anidadas:", error);
+        alert("Ocurrió un error global al enviar las facturas anidadas.");
+      }
+    },
+
+
 
 
     limpiarBaseDeDatos() {
@@ -678,7 +703,7 @@ export default {
       factura.total = this.calcularTotal(
         factura.cantidadProducto,
         factura.valor_unitario,
-        factura.codigoImpuestoCargo,
+        factura.iva,
         factura.valorReteica,
         factura.valor_retencion
       );
@@ -702,12 +727,12 @@ export default {
       doc.text(` ${factura.codigo_producto}`, offsetX - 75, offsetY + 53);
       doc.text(` ${factura.cantidadProducto}`, offsetX - 43, offsetY + 53);
       doc.text(` ${factura.valor_unitario}`, offsetX - 29, offsetY + 53);
-      const impuestoImprimir = factura.codigoImpuestoCargo === 3 ? 19 : factura.codigoImpuestoCargo; doc.text(` ${impuestoImprimir}`, offsetX - 15, offsetY + 53); //
+      const impuestoImprimir = factura.iva === 3 ? 19 : factura.iva; doc.text(` ${impuestoImprimir}`, offsetX - 15, offsetY + 53); //
       doc.text(` ${factura.valor_retencion}`, offsetX - 4.5, offsetY + 53);
       const valorReteicaFormateado = factura.valorReteica || 0; doc.text(` ${valorReteicaFormateado}`, offsetX + 10, offsetY + 53);
       doc.text(` ${factura.total}`, offsetX + 29, offsetY + 97); //total inferior 
       doc.text(` ${factura.valor_unitario}`, offsetX + 29, offsetY + 75);
-      doc.text(` ${factura.codigoImpuestoCargo}`, offsetX + 30, offsetY + 80); //
+      doc.text(` ${factura.iva}`, offsetX + 30, offsetY + 80); //
       doc.text(` ${factura.valor_retencion}`, offsetX + 30, offsetY + 86); //
       doc.text(` ${factura.valorReteica}`, offsetX + 30, offsetY + 92); //
       doc.text(` ${factura.identificacion}`, offsetX - 55, offsetY + 151); // tirilla
