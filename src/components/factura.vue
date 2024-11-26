@@ -135,131 +135,133 @@ export default {
     },
 
     procesarArchivo(datos) {
-      const archivo = datos.target.files[0];
-      if (archivo) {
-        this.nombreArchivo = archivo.name;
+  const archivo = datos.target.files[0];
+  if (archivo) {
+    this.nombreArchivo = archivo.name;
 
-        const reader = new FileReader();
-        reader.onload = (e) => {
-          const contenido = e.target.result;
-          const filas = contenido.split("\n");
-          const encabezados = filas[0].split(";"); // Primera fila como encabezados
-          const datos = [];
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const contenido = e.target.result;
+      const filas = contenido.split("\n");
+      const encabezados = filas[0].split(";"); // Primera fila como encabezados
+      const datos = [];
 
-          // Convertir filas en objetos usando encabezados
-          for (let i = 1; i < filas.length; i++) {
-            const columnas = filas[i].split(";");
-            const objeto = {};
+      // Convertir filas en objetos usando encabezados
+      for (let i = 1; i < filas.length; i++) {
+        const columnas = filas[i].split(";");
+        const objeto = {};
 
-            encabezados.forEach((header, index) => {
-              objeto[header.trim()] = columnas[index]?.trim();
-            });
-            datos.push(objeto);
-          }
+        encabezados.forEach((header, index) => {
+          objeto[header.trim()] = columnas[index]?.trim();
+        });
+        datos.push(objeto);
+      }
 
-          // Crear listas separadas para facturas simples y anidadas
-          const facturasSimples = [];
-          const facturasAnidadas = [];
-          const facturasUnicas = {};
+      // Crear listas separadas para facturas simples y anidadas
+      const facturasSimples = [];
+      const facturasAnidadas = [];
+      const facturasUnicas = {};
 
-          datos.forEach((dato) => {
-            const identificacion = dato["Identificación tercero"]?.trim(); // Identificación única del cliente
+      datos.forEach((dato) => {
+        const identificacion = dato["Identificación tercero"]?.trim();
 
-            // Obtener valores desde el archivo
-            const precioUnitario = parseFloat(dato["Valor unitario"] || 0);
-            const cantidad = parseInt(dato["Cantidad producto"] || 0, 10);
-            const descuento = parseFloat(dato["Código impuesto cargo"] || 0);
-            const reteicaPorcentaje = parseFloat(dato["Reteica"] || 0);
-            const retencionPorcentaje = parseFloat(dato["Valor Retencion"] || 0);
+        // Obtener valores desde el archivo
+        const precioUnitario = parseFloat(dato["Valor unitario"] || 0);
+        const cantidad = parseInt(dato["Cantidad producto"] || 0, 10);
+        const descuento = parseFloat(dato["Código impuesto cargo"] || 0);
+        const reteicaPorcentaje = parseFloat(dato["Reteica"] || 0);
+        const retencion = parseFloat(dato["Valor Retencion"] || 0); // Valor directo de la retención
 
-            // Calcular valor bruto
-            const valorBruto = precioUnitario * cantidad;
-            let iva = 0;
+        // Calcular valor bruto
+        const valorBruto = precioUnitario * cantidad;
+        let iva = 0;
 
-            // Si el código de impuesto es 3, aplicar el cálculo especial
-            if (descuento === 3) {
-              iva = (valorBruto * 19) / 100; // Caso especial: IVA del 19%
-            } else {
-              iva = (valorBruto * descuento) / 100; // Calcular IVA general según porcentaje
-            }
+        if (descuento === 3) {
+          iva = (valorBruto * 19) / 100;
+        } else {
+          iva = (valorBruto * descuento) / 100;
+        }
 
-            // Calcular impuestos adicionales
-            const reteica = (valorBruto * reteicaPorcentaje) / 100;
-            const retencion = (retencionPorcentaje);
+        // Calcular total del ítem: valor bruto + IVA
+        const totalItem = valorBruto + iva;
 
-            // Calcular total del ítem
-            const totalItem = valorBruto + iva - reteica - retencion;
-
-            // Crear un objeto para el producto actual
-            const producto = {
-              codigo_producto: dato["Código producto"] || "Producto sin nombre",
-              price: precioUnitario,
-              quantity: cantidad,
-              unit: "service", // Ajusta según tu caso
-              tax: [
-                { type: "IVA", amount: iva || 0 },
-                { type: "Retención", amount: retencion || 0 },
-                { type: "Reteica", amount: reteica || 0 },
-              ],
-              subtotal: valorBruto,
-              total: totalItem,
-            };
-
-            // Verificar si la factura ya existe
-            if (!facturasUnicas[identificacion]) {
-              // Crear una nueva factura base si no existe
-              facturasUnicas[identificacion] = {
-                id: dato["Id factura"] || null, // Si hay un ID de factura en el CSV
-                date: dato["Fecha de elaboración"],
-                dueDate: dato["FechaVencimiento"],
-                client: {
-                  name: dato["Nombre contacto"],
-                  identification: dato["Identificación tercero"],
-                },
-                subtotal: 0,
-                tax: 0,
-                total: 0,
-                items: [producto], // Agregar el primer producto
-              };
-            } else {
-              // Si ya existe, agregar el producto al arreglo de items
-              facturasUnicas[identificacion].items.push(producto);
-            }
-
-            // Actualizar subtotales y totales de la factura
-            facturasUnicas[identificacion].subtotal += producto.subtotal;
-            facturasUnicas[identificacion].tax += producto.tax.reduce((acc, t) => acc + t.amount, 0);
-            facturasUnicas[identificacion].total += totalItem;
-          });
-
-          // Calcular totales de las facturas
-          Object.values(facturasUnicas).forEach((factura) => {
-            // Sumar los totales de los ítems
-            factura.total = factura.items.reduce((sum, item) => sum + item.total, 0);
-
-            // Clasificar en simples o anidadas
-            if (factura.items.length > 1) {
-              facturasAnidadas.push(factura); // Más de un producto = factura anidada
-            } else {
-              facturasSimples.push(factura); // Solo un producto = factura simple
-            }
-          });
-
-          // Subir ambas listas a sus correspondientes estados o tablas
-          this.facturasSimples = facturasSimples;
-          this.facturasAnidadas = facturasAnidadas;
-          this.rows = [...this.facturasSimples, ...this.facturasAnidadas];
-
-          console.log("Rows actualizados con simples y anidadas:", this.rows);
-          console.log("Facturas Simples:", this.facturasSimples);
-          console.log("Facturas Anidadas:", this.facturasAnidadas);
+        // Crear un objeto para el producto actual
+        const producto = {
+          codigo_producto: dato["Código producto"] || "Producto sin nombre",
+          price: precioUnitario,
+          quantity: cantidad,
+          unit: "service",
+          tax: [
+            { type: "IVA", amount: iva || 0 },
+            { type: "Reteica", amount: (valorBruto * reteicaPorcentaje) / 100 || 0 },
+          ],
+          subtotal: valorBruto,
+          total: totalItem, // Total del ítem sin restar la retención
         };
 
-        reader.readAsText(archivo);
-      } else {
-        this.nombreArchivo = "";
-      }
-    },
+        // Verificar si la factura ya existe
+        if (!facturasUnicas[identificacion]) {
+          facturasUnicas[identificacion] = {
+            id: dato["Id factura"] || null,
+            date: dato["Fecha de elaboración"],
+            dueDate: dato["FechaVencimiento"],
+            client: {
+              name: dato["Nombre contacto"],
+              identification: dato["Identificación tercero"],
+            },
+            subtotal: 0,
+            tax: 0,
+            total: 0,
+            retentionsSuggested: [], // Retenciones a nivel de factura
+            items: [],
+          };
+        }
+
+        // Agregar el producto a la factura
+        facturasUnicas[identificacion].items.push(producto);
+
+        // Actualizar subtotales y totales
+        facturasUnicas[identificacion].subtotal += valorBruto;
+        facturasUnicas[identificacion].tax += iva;
+        facturasUnicas[identificacion].total += totalItem;
+        
+        // Agregar retenciones a nivel de factura
+        if (retencion > 0) {
+          facturasUnicas[identificacion].retentionsSuggested.push({
+            id: `retencion_${dato["Código producto"] || i}`, // Generar un ID único
+            amount: retencion,
+            percentage: ((retencion / valorBruto) * 100).toFixed(2), // Calcular porcentaje
+          });
+        }
+      });
+
+      // Ajustar el total de cada factura restando las retenciones
+      Object.values(facturasUnicas).forEach((factura) => {
+        const totalRetenciones = factura.retentionsSuggested.reduce((sum, ret) => sum + ret.amount, 0);
+        factura.total -= totalRetenciones;  // Restar retenciones del total final
+
+        if (factura.items.length > 1) {
+          facturasAnidadas.push(factura);
+        } else {
+          facturasSimples.push(factura);
+        }
+      });
+
+      // Actualizar el estado con las facturas procesadas
+      this.facturasSimples = facturasSimples;
+      this.facturasAnidadas = facturasAnidadas;
+
+      console.log("Rows actualizados con simples y anidadas:", this.rows);
+      console.log("Facturas Simples:", this.facturasSimples);
+      console.log("Facturas Anidadas:", this.facturasAnidadas);
+    };
+
+    reader.readAsText(archivo);
+  } else {
+    this.nombreArchivo = "";
+  }
+},
+
 
     async subirArchivo() {
       const archivo = this.$refs.fileInput.files[0];
@@ -317,13 +319,13 @@ export default {
           }
 
         });
-        console.log('impuestos', this.rows)
+        // console.log('impuestos', this.rows)
         // Convertir el objeto de facturas agrupadas en un array para usarlo en la tabla
         this.rows = Object.values(facturasAgrupadas);
       };
 
       reader.onerror = (error) => {
-        console.error("Error al leer el archivo:", error);
+        // console.error("Error al leer el archivo:", error);
       };
 
       reader.readAsText(archivo);
@@ -358,12 +360,12 @@ export default {
               }], // Si no hay items, agregamos el único producto
             };
 
-            console.log(`Enviando factura simple ${index + 1}:`, datosFactura);
+            // console.log(`Enviando factura simple ${index + 1}:`, datosFactura);
 
             try {
               return await facturaStore.enviarFactura(datosFactura);
             } catch (error) {
-              console.error(`Error en enviarFactura para factura simple ${index + 1}:`, error);
+              // console.error(`Error en enviarFactura para factura simple ${index + 1}:`, error);
               return { success: false, error: error.message };
             }
           })
@@ -371,85 +373,80 @@ export default {
 
         responses.forEach((response, index) => {
           if (response.success) {
-            console.log(`Factura simple ${index + 1} enviada exitosamente:`, response);
+            // console.log(`Factura simple ${index + 1} enviada exitosamente:`, response);
           } else {
-            console.error(`Error al enviar factura simple ${index + 1}:`, response.error || "Error desconocido");
+            // console.error(`Error al enviar factura simple ${index + 1}:`, response.error || "Error desconocido");
             alert(`Error al enviar la factura simple ${index + 1}: ${response.error || "Error desconocido"}`);
           }
         });
       } catch (error) {
-        console.error("Error global al enviar las facturas simples:", error);
+        // console.error("Error global al enviar las facturas simples:", error);
         alert("Ocurrió un error al enviar las facturas simples. Por favor, revisa la consola para más detalles.");
       }
     },
 
     async enviarFacturasAnidadas() {
-      if (!this.facturasAnidadas || this.facturasAnidadas.length === 0) {
-        alert("No hay facturas anidadas para enviar. Por favor, verifica el archivo CSV.");
-        return;
+  if (!this.facturasAnidadas || this.facturasAnidadas.length === 0) {
+    alert("No hay facturas anidadas para enviar. Por favor, verifica el archivo CSV.");
+    return;
+  }
+
+  try {
+    const responses = await Promise.all(
+      this.facturasAnidadas.map(async (factura, index) => {
+        try {
+          // Calcular total de impuestos y retenciones
+          const totalRetenciones = factura.retentionsSuggested?.reduce((sum, ret) => sum + ret.amount, 0) || 0;
+          const totalFacturaAjustado = factura.total - totalRetenciones;
+          console.log('totalRetenciones',factura.total)
+
+          // Preparar los datos de la factura anidada
+          const datosFactura = {
+            identification: factura.client?.identification,
+            fecha_vencimiento: factura.dueDate,
+            fecha_elaboracion: factura.date,
+            nombre: factura.client?.name,
+            tax: factura.tax, // Total de impuestos de la factura
+            total: factura.total, // Total ajustado restando retenciones
+            retentions: factura.retentionsSuggested || [], // Agregar retenciones sugeridas
+            anotation: factura.anotation, 
+            items: factura.items.map((item) => {
+              // Calcular el total del ítem (valor bruto + IVA)
+              const itemTotal = item.subtotal + item.tax.reduce((sum, t) => sum + t.amount, 0);
+
+              return {
+                codigo: item.codigo_producto,
+                price: item.price,
+                quantity: item.quantity,
+                unit: item.unit,
+                tax: item.tax, // Incluir IVA y otros impuestos
+                total: itemTotal, // Total del ítem
+              };
+            }),
+          };
+
+          // Enviar la factura a la API
+          return await facturaStore.enviarFactura(datosFactura);
+
+        } catch (error) {
+          return { success: false, error: error.message };
+        }
+      })
+    );
+
+    responses.forEach((response, index) => {
+      if (response && response.success) {
+        console.log(`Factura anidada ${index + 1} enviada exitosamente.`);
+      } else {
+        console.error(`Error al enviar factura anidada ${index + 1}:`, response.error);
+        alert(`Error al enviar la factura anidada ${index + 1}: ${response.error}`);
       }
-
-      try {
-        const responses = await Promise.all(
-          this.facturasAnidadas.map(async (factura, index) => {
-            try {
-              // Preparar los datos de la factura anidada
-              const datosFactura = {
-  identification: factura.client?.identification,
-  fecha_vencimiento: factura.dueDate,
-  fecha_elaboracion: factura.date,
-  nombre: factura.client?.name,
-  tax: factura.tax, // Total de impuestos de la factura
-  total: factura.total, // Total calculado de la factura
-  items: factura.items.map((item) => {
-    const tax = item.tax?.length ? item.tax : [
-      { type: "IVA", amount: (item.price * item.quantity * 0.19) || 0 },
-    ]; // Default al 19% IVA si no tiene datos
-    return {
-      codigo: item.codigo_producto,
-      price: item.price,
-      quantity: item.quantity,
-      unit: item.unit,
-      tax, // Asegura que siempre tenga impuestos
-      total: item.total || (item.price * item.quantity + tax.reduce((acc, t) => acc + t.amount, 0)),
-    };
-  }),
-};
-console.log('Factura preparada para enviar:', datosFactura);
-
-              console.log('Validando impuestos de los ítems antes del envío...');
-              factura.items.forEach((item, index) => {
-                console.log(`Ítem ${index + 1} - Código: ${item.codigo_producto}`, item.tax);
-              });
-              console.log('datos de la factura', datosFactura)
-
-              console.log(`Enviando factura anidada ${index + 1}:`, datosFactura);
-
-              // Aquí puedes enviar la factura a Alegra
-              return await facturaStore.enviarFactura(datosFactura);
-
-            } catch (error) {
-              console.error(`Error en factura anidada ${index + 1}:`, error.message);
-              return { success: false, error: error.message };
-            }
-          })
-        );
-
-        responses.forEach((response, index) => {
-          if (response) {
-            console.log(`Factura anidada ${index + 1} enviada exitosamente.`);
-          } else {
-            console.error(`Error al enviar factura anidada ${index + 1}:`, response.error);
-            alert(`Error al enviar la factura anidada ${index + 1}: ${response.error}`);
-          }
-        });
-      } catch (error) {
-        console.error("Error global al enviar facturas anidadas:", error);
-        alert("Ocurrió un error global al enviar las facturas anidadas.");
-      }
-    },
-
-
+    });
+  } catch (error) {
+    alert("Ocurrió un error global al enviar las facturas anidadas.");
+  }
+}
+,
 
 
     limpiarBaseDeDatos() {

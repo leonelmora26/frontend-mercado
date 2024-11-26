@@ -1,4 +1,5 @@
 import { defineStore } from "pinia";
+
 export const useFacturaStore = defineStore('factura', {
   state: () => ({
     facturaResponse: null,
@@ -40,22 +41,31 @@ export const useFacturaStore = defineStore('factura', {
         facturaData.items = await Promise.all(
           facturaData.items.map(async (item) => {
             console.log('Procesando ítem:', item);
+
+            // Obtener datos del ítem
             const itemData = await this.obtenerItem(item.codigo);
-            console.log('Datos del ítem obtenido:', itemData);
             if (!itemData) {
               throw new Error(`Error: No se encontró el ítem con código ${item.codigo}`);
             }
+
+            // Calcular el IVA
+            const iva = item.tax?.find((t) => t.type === "IVA")?.amount || 0;
+
+            // Construir el objeto del ítem
             const processedItem = {
-              id: itemData.id,
-              name: itemData.name,
-              price: item.price || itemData.price[0]?.price || null,
+              id: itemData.id || null, // ID del ítem
+              name: itemData.name || "Sin nombre",
+              price: item.price || itemData.price[0]?.price || 0,
               quantity: item.quantity || 1,
-              description: item.description || '',
-              observations: item.observations || '',
+              unit: item.unit || "service",
               discount: item.discount || 0,
-              tax: item.tax || [], // Mantén los impuestos originales
-            };            
-            console.log('Ítem procesado:', processedItem);
+              tax: [
+                ...(iva > 0 ? [{ id: 3, amount: iva }] : []), // Solo agregar IVA si corresponde
+              ],
+              total: item.total || 0,
+            };
+
+            console.log('Ítem procesado con impuestos:', processedItem);
             return processedItem;
           })
         );
@@ -131,6 +141,9 @@ export const useFacturaStore = defineStore('factura', {
     },
 
     prepararFactura(facturaData) {
+      // La preparación no realiza cálculos, ya que los valores vienen precalculados
+      const totalRetentions = facturaData.retentions.reduce((acc, retention) => acc + retention.amount, 0);
+
       const preparedFactura = {
         client: { id: facturaData.client_id },
         date: facturaData.date,
@@ -138,11 +151,21 @@ export const useFacturaStore = defineStore('factura', {
         paymentMethod: facturaData.paymentMethod || 'CASH',
         paymentForm: facturaData.paymentForm || 'CREDIT',
         operationType: facturaData.operationType || 'AIU_SERVICE',
-        items: facturaData.items,
-        termsConditions: facturaData.termsConditions || 'Esta Factura se podrá cancelar en: BANCOLOMBIA en la cuenta de ahorro Numero 32200000480 OFICINA PRINCIPAL ubicada Cra 8 No 16-14',
-        anotation: facturaData.anotation || 'MIKROTECK SAS. Empresa autorizada y vigilada por el MINTIC. Registro TIC 96003535',
+        items: facturaData.items.map(item => ({
+          id: item.id,
+          name: item.name,
+          price: item.price,
+          quantity: item.quantity,
+          discount: item.discount,
+          unit: item.unit || 'service',
+          tax: item.tax || [],
+        })), 
+        termsConditions: facturaData.termsConditions ||'Esta factura se asimila en todos sus efectos a una letra de cambio de conformidad con el Art. 774 del código de comercio. Autorizo que en caso de incumplimiento de esta obligación sea reportado a las centrales de riesgo, Recargo por mora y reconexión de $5.000 el cual se vera reflejado en la siguiente facturación. MIKROTECK SAS. Empresa autorizada y vigilada por el MINTIC. Registro TIC 96003535\n' ,
+        anotation: facturaData.anotation || 'Esta Factura se podrá cancelar en:\nBANCOLOMBIA en la cuenta de ahorro Numero 32200000480\nOFICINA PRINCIPAL ubicada Cra 8 No 16-14 o por el codigo QR nequi, el cual debes solicitar por Whatsapp\nLas PQR pueden ser interpuestas a través de las lineas telefónicas 3504632437 o mediante correo electrónico a SOPORTE@MIKROTECKSG.COM.',
+        total: facturaData.total || 0,  // Se asume que el total ya está calculado
       };
-      console.log('Factura preparada:', preparedFactura);
+
+      console.log("Factura preparada para enviar sin cálculos:", preparedFactura);
       return preparedFactura;
     },
 
