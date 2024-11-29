@@ -11,6 +11,11 @@ export const useFacturaStore = defineStore('factura', {
   actions: {
     // Función principal para añadir facturas a la cola y procesarlas
     async enviarFactura(facturaData) {
+      if (!facturaData || !facturaData.identification || !facturaData.items || facturaData.items.length === 0) {
+        console.error("Datos incompletos para la factura:", facturaData);
+        return { success: false, error: "Datos incompletos para la factura" };
+      }
+
       console.log('Factura recibida para enviar:', facturaData);
       this.facturasPendientes.push(facturaData); // Añadir factura a la cola
       await this.procesarCola(); // Intentar procesar la cola
@@ -18,118 +23,110 @@ export const useFacturaStore = defineStore('factura', {
 
     // Procesar la cola de facturas
     async procesarCola() {
-      if (this.isSending || this.facturasPendientes.length === 0) return; // Si ya está enviando, espera
+      while (this.facturasPendientes.length > 0 && !this.isSending) {
+        this.isSending = true;
+        const facturaData = this.facturasPendientes.shift(); // Saca la primera factura en la cola
+        console.log('Procesando factura:', facturaData);
 
-      this.isSending = true;
-      const facturaData = this.facturasPendientes.shift(); // Saca la primera factura en la cola
-      console.log('Procesando factura:', facturaData);
+        try {
+          // Paso 1: Obtener client_id
+          const clientId = await this.obtenerClientId(facturaData.identification);
+          console.log('clientId obtenido:', clientId);
+          if (!clientId) {
+            throw new Error("No se pudo obtener client_id para el cliente.");
+          }
 
-      try {
-        // Paso 1: Obtener client_id
-        const clientId = await this.obtenerClientId(facturaData.identification);
-        console.log('clientId obtenido:', clientId);
-        if (!clientId) {
-          throw new Error("Error: No se pudo obtener client_id para el cliente.");
+          facturaData.client_id = clientId;
+          facturaData.date = facturaData.fecha_elaboracion || '';
+          facturaData.dueDate = facturaData.fecha_vencimiento || '';
+
+          // Paso 2: Procesar los ítems
+          facturaData.items = await this.procesarItems(facturaData.items);
+
+          // Paso 3: Preparar y enviar la factura
+          const preparedFactura = this.prepararFactura(facturaData);
+          console.log('Factura preparada para enviar:', preparedFactura);
+
+          const response = await this.enviarDatosAFactura(preparedFactura);
+          console.log('Respuesta del envío de la factura:', response);
+
+          this.facturaResponse = response.success
+            ? { success: true, response: response.result }
+            : { success: false, error: response.error };
+        } catch (error) {
+          console.error("Error en el proceso de envío de factura:", error.message);
+          this.facturaResponse = { success: false, error: error.message };
+        } finally {
+          this.isSending = false; // Liberar el flag
         }
+      }
+    },
 
-        facturaData.client_id = clientId;
-        facturaData.date = facturaData.fecha_elaboracion || '';
-        facturaData.dueDate = facturaData.fecha_vencimiento || '';
-        console.log('Factura con clientId agregado:', facturaData);
-
-        // Paso 2: Obtener el item_id
-        facturaData.items = await Promise.all(
-          facturaData.items.map(async (item) => {
+    async procesarItems(items) {
+      return await Promise.all(
+        items.map(async (item) => {
+          try {
             console.log('Procesando ítem:', item);
-
-            // Obtener datos del ítem
             const itemData = await this.obtenerItem(item.codigo);
-            if (!itemData) {
-              throw new Error(`Error: No se encontró el ítem con código ${item.codigo}`);
-            }
+            if (!itemData) throw new Error(`Ítem no encontrado: ${item.codigo}`);
 
-            // Calcular el IVA
             const iva = item.tax?.find((t) => t.type === "IVA")?.amount || 0;
 
-            // Construir el objeto del ítem
-            const processedItem = {
-              id: itemData.id || null, // ID del ítem
+            return {
+              id: itemData.id,
               name: itemData.name || "Sin nombre",
               price: item.price || itemData.price[0]?.price || 0,
               quantity: item.quantity || 1,
               unit: item.unit || "service",
               discount: item.discount || 0,
-              tax: [
-                ...(iva > 0 ? [{ id: 3, amount: iva }] : []), // Solo agregar IVA si corresponde
-              ],
-              total: item.total || 0,
+              tax: iva > 0 ? [{ id: 3, amount: iva }] : [],
             };
-
-            console.log('Ítem procesado con impuestos:', processedItem);
-            return processedItem;
-          })
-        );
-
-        console.log('Todos los ítems procesados:', facturaData.items);
-
-        // Paso 3: Preparar y enviar la factura
-        const preparedFactura = this.prepararFactura(facturaData);
-        console.log('Factura preparada para enviar:', preparedFactura);
-
-        const response = await this.enviarDatosAFactura(preparedFactura);
-        console.log('Respuesta del envío de la factura:', response);
-
-        this.facturaResponse = response.success
-          ? { success: true, response: response.result }
-          : { success: false, error: response.error };
-
-      } catch (error) {
-        console.error("Error en el proceso de envío de factura:", error.message);
-        this.facturaResponse = { success: false, error: error.message };
-      } finally {
-        this.isSending = false; // Liberar el flag
-        if (this.facturasPendientes.length > 0) {
-          console.log('Procesando la siguiente factura en la cola...');
-          this.procesarCola(); // Llamar de nuevo para procesar la siguiente factura en la cola
-        }
-      }
-
-      return this.facturaResponse;
+          } catch (error) {
+            console.error("Error al procesar ítem:", error.message);
+            return null; // Opcional: Maneja qué hacer con ítems inválidos
+          }
+        })
+      );
     },
 
     async obtenerItem(codigoProducto) {
+      const API_KEY = import.meta.env.VITE_ALEGRA_API_KEY;
+
       try {
         console.log('Buscando ítem con código:', codigoProducto);
         const response = await fetch(`https://api.alegra.com/api/v1/items?query=${codigoProducto}`, {
           method: 'GET',
           headers: {
             'Content-Type': 'application/json',
-            'Authorization': `Basic ${import.meta.env.VITE_ALEGRA_API_KEY}`,
+            'Authorization': `Basic ${API_KEY}`,
           },
         });
         const data = await response.json();
         console.log('Respuesta de la API para ítem:', data);
         return data.find(i => i.reference === codigoProducto) || null;
       } catch (error) {
-        console.error("Error al obtener item_id:", error);
+        console.error("Error al obtener item_id:", error.message);
         return null;
       }
     },
 
     async enviarDatosAFactura(preparedFactura) {
+      const API_KEY = import.meta.env.VITE_ALEGRA_API_KEY;
+
       try {
         console.log('Enviando datos de factura a la API:', preparedFactura);
-        const response = await fetch('https://api.alegra.com/api/v1/invoices', {
+        const response = await fetch('https://api.alegra.com/api/v1/invoicess', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            'Authorization': `Basic ${import.meta.env.VITE_ALEGRA_API_KEY}`,
+            'Authorization': `Basic ${API_KEY}`,
             'Accept': 'application/json',
           },
           body: JSON.stringify(preparedFactura),
         });
         const result = await response.json();
         console.log('Respuesta de la API al enviar factura:', result);
+
         if (!response.ok) {
           throw new Error(result.error || "Error desconocido al enviar la factura.");
         }
@@ -141,17 +138,18 @@ export const useFacturaStore = defineStore('factura', {
     },
 
     prepararFactura(facturaData) {
-      // La preparación no realiza cálculos, ya que los valores vienen precalculados
-      const totalRetentions = facturaData.retentions.reduce((acc, retention) => acc + retention.amount, 0);
-
       const preparedFactura = {
-        client: { id: facturaData.client_id },
+        client: { 
+          id: facturaData.client_id,
+          name: facturaData.nombre,
+          identification: facturaData.identification,
+        },
         date: facturaData.date,
         dueDate: facturaData.dueDate,
         paymentMethod: facturaData.paymentMethod || 'CASH',
         paymentForm: facturaData.paymentForm || 'CREDIT',
         operationType: facturaData.operationType || 'AIU_SERVICE',
-        items: facturaData.items.map(item => ({
+        items: facturaData.items.filter(item => item).map(item => ({
           id: item.id,
           name: item.name,
           price: item.price,
@@ -159,24 +157,27 @@ export const useFacturaStore = defineStore('factura', {
           discount: item.discount,
           unit: item.unit || 'service',
           tax: item.tax || [],
-        })), 
-        termsConditions: facturaData.termsConditions ||'Esta factura se asimila en todos sus efectos a una letra de cambio de conformidad con el Art. 774 del código de comercio. Autorizo que en caso de incumplimiento de esta obligación sea reportado a las centrales de riesgo, Recargo por mora y reconexión de $5.000 el cual se vera reflejado en la siguiente facturación. MIKROTECK SAS. Empresa autorizada y vigilada por el MINTIC. Registro TIC 96003535\n' ,
-        anotation: facturaData.anotation || 'Esta Factura se podrá cancelar en:\nBANCOLOMBIA en la cuenta de ahorro Numero 32200000480\nOFICINA PRINCIPAL ubicada Cra 8 No 16-14 o por el codigo QR nequi, el cual debes solicitar por Whatsapp\nLas PQR pueden ser interpuestas a través de las lineas telefónicas 3504632437 o mediante correo electrónico a SOPORTE@MIKROTECKSG.COM.',
-        total: facturaData.total || 0,  // Se asume que el total ya está calculado
+        })),
+        retentions: facturaData.retentions || [],
+        anotation: "Esta Factura se podrá cancelar en:\nBANCOLOMBIA en la cuenta de ahorro Numero 32200000480\nOFICINA PRINCIPAL ubicada Cra 8 No 16-14 o por el codigo QR nequi, el cual debes solicitar por Whatsapp\nLas PQR pueden ser interpuestas a través de las lineas telefónicas 3504632437 o mediante correo electrónico a SOPORTE@MIKROTECKSG.COM.",
+        termsConditions: "Esta factura se asimila en todos sus efectos a una letra de cambio de conformidad con el Art. 774 del código de comercio. Autorizo que en caso de incumplimiento de esta obligación sea reportado a las centrales de riesgo, Recargo por mora y reconexión de $5.000 el cual se vera reflejado en la siguiente facturación. MIKROTECK SAS. Empresa autorizada y vigilada por el MINTIC. Registro TIC 96003535\n",
+        total: facturaData.total || 0,
       };
-
-      console.log("Factura preparada para enviar sin cálculos:", preparedFactura);
+    
+      console.log("Factura preparada:", preparedFactura);
       return preparedFactura;
     },
 
     async obtenerClientId(identification) {
+      const API_KEY = import.meta.env.VITE_ALEGRA_API_KEY;
+
       try {
         console.log('Buscando clientId para identificación:', identification);
         const response = await fetch(`https://api.alegra.com/api/v1/contacts?identification=${identification}`, {
           method: 'GET',
           headers: {
             'Content-Type': 'application/json',
-            'Authorization': `Basic ${import.meta.env.VITE_ALEGRA_API_KEY}`,
+            'Authorization': `Basic ${API_KEY}`,
           },
         });
         const data = await response.json();

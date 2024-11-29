@@ -13,6 +13,7 @@
     "axios": "^1.7.4",
     "floating-vue": "^5.2.2",
     "jspdf": "^2.5.2",
+    "notyf": "^3.10.0",
     "papaparse": "^5.4.1",
     "pinia": "^2.2.2",
     "pinia-plugin-persistedstate": "^3.2.1",
