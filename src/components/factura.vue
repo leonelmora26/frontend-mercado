@@ -229,6 +229,7 @@ export default {
             if (retencion > 0) {
               facturasUnicas[identificacion].retentionsSuggested.push({
                 name: 'retención',
+                id: `retencion_${dato["Código producto"] || i}`, // Generar un ID único
                 amount: retencion,
                 percentage: ((retencion / valorBruto) * 100).toFixed(2), // Calcular porcentaje
               });
@@ -261,6 +262,7 @@ export default {
         this.nombreArchivo = "";
       }
     },
+
     async obtenerDatosCliente(identificacion) {
       const facturaStore = useFacturaStore();
       const clienteData = await facturaStore.obtenerClientId(identificacion);
