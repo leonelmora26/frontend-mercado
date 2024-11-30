@@ -228,8 +228,7 @@ export default {
             // Agregar retenciones a nivel de factura
             if (retencion > 0) {
               facturasUnicas[identificacion].retentionsSuggested.push({
-                name: 'retención',
-                id: `retencion_${dato["Código producto"] || i}`, // Generar un ID único
+                id: `14`, // Generar un ID único
                 amount: retencion,
                 percentage: ((retencion / valorBruto) * 100).toFixed(2), // Calcular porcentaje
               });
@@ -252,9 +251,9 @@ export default {
           this.facturasSimples = facturasSimples;
           this.facturasAnidadas = facturasAnidadas;
 
-          // console.log("Rows actualizados con simples y anidadas:", this.rows);
-          // console.log("Facturas Simples:", this.facturasSimples);
-          // console.log("Facturas Anidadas:", this.facturasAnidadas);
+          console.log("Rows actualizados con simples y anidadas:", this.rows);
+          console.log("Facturas Simples:", this.facturasSimples);
+          console.log("Facturas Anidadas:", this.facturasAnidadas);
         };
 
         reader.readAsText(archivo);
@@ -273,7 +272,6 @@ export default {
       } else {
         this.cliente = null; // Limpia si no encuentra datos
         console.warn(`No se encontró cliente para la identificación ${identificacion}`);
-
       }
     },
 
@@ -352,59 +350,57 @@ export default {
     },
 
     async enviarFacturaSimples() {
-      const facturasSimples = this.rows.filter(factura => !factura.items || factura.items.length === 0); // Facturas sin items
-      if (facturasSimples.length === 0) {
-        alert("No hay facturas simples para enviar. Por favor, carga un archivo CSV primero.");
-        return;
+  const facturasSimples = this.facturasSimples; // Utiliza las facturas separadas previamente
+  if (facturasSimples.length === 0) {
+    alert("No hay facturas simples para enviar. Por favor, carga un archivo CSV primero.");
+    return;
+  }
+
+  try {
+    const responses = await Promise.allSettled(
+      facturasSimples.map(async (factura, index) => {
+        // Calcular total de retenciones
+        const totalRetenciones = factura.retentionsSuggested?.reduce((sum, ret) => sum + ret.amount, 0) || 0;
+        const totalFacturaAjustado = factura.total - totalRetenciones; // Ajustar total
+
+        // Preparar los datos de la factura simple
+        const datosFactura = {
+          identification: factura.client?.identification || factura.identificacion,
+          fecha_vencimiento: factura.dueDate || factura.fecha_vencimiento,
+          fecha_elaboracion: factura.date || factura.fecha_elaboracion,
+          nombre: factura.client?.name || factura.nombre,
+          tax: factura.tax, // Total de impuestos calculados
+          total: totalFacturaAjustado, // Total ajustado con retenciones
+          retentions: factura.retentionsSuggested || [], // Retenciones aplicadas
+          items: factura.items.map((item) => ({
+            codigo: item.codigo_producto,
+            price: item.price,
+            quantity: item.quantity,
+            unit: item.unit,
+            tax: item.tax, // Incluye IVA y otros impuestos
+            total: item.subtotal + item.tax.reduce((sum, t) => sum + t.amount, 0), // Total del ítem
+          })),
+        };
+
+        // Enviar la factura a la API
+        return await facturaStore.enviarFactura(datosFactura);
+      })
+    );
+
+    // Manejar las respuestas
+    responses.forEach((result, index) => {
+      if (result.status === "fulfilled" && result.value?.success) {
+        alert(`Factura simple ${index + 1} enviada exitosamente.`);
+      } else {
       }
+    });
+  } catch (error) {
+    console.error("Error global:", error);
+    alert("Ocurrió un error global inesperado al enviar las facturas simples.");
+  }
+}
+,
 
-      try {
-        const responses = await Promise.all(
-          facturasSimples.map(async (factura, index) => {
-            console.log("factura", factura)
-            // Si no tiene items, asignamos un producto por defecto
-            const items = factura.items || [{
-              codigo: factura.codigo_producto || "Producto sin nombre",
-              price: parseFloat(factura.valor_unitario || 0),
-              quantity: parseInt(factura.cantidadProducto || 0, 10),
-              unit: "service",
-              tax: [],
-              total: parseFloat(factura.valor_unitario || 0) * parseInt(factura.cantidadProducto || 0, 10),
-            }];
-
-            // Preparar los datos de la factura
-            const datosFactura = {
-              identification: factura.identificacion,
-              fecha_vencimiento: factura.fecha_vencimiento,
-              fecha_elaboracion: factura.fecha_elaboracion,
-              nombre: factura.nombre,
-              tax: factura.tax || 0,
-              total: factura.total || 0,
-              retentions: factura.retentionsSuggested || [], // Agregar retenciones sugeridas
-              items: items, // Los items para la factura
-            };
-
-            // Enviar la factura
-            try {
-              return await facturaStore.enviarFactura(datosFactura);
-            } catch (error) {
-              return { success: false, error: error.message };
-            }
-          })
-        );
-
-        // Manejo de respuestas
-        responses.forEach((response, index) => {
-          if (response.success) {
-            // Éxito en el envío
-          } else {
-            alert(`Error al enviar la factura simple ${index + 1}: ${response.error || "Error desconocido"}`);
-          }
-        });
-      } catch (error) {
-        alert("Ocurrió un error al enviar las facturas simples.");
-      }
-    },
     async enviarFacturasAnidadas() {
       if (!this.facturasAnidadas || this.facturasAnidadas.length === 0) {
         alert("No hay facturas anidadas para enviar. Por favor, verifica el archivo CSV.");
@@ -418,6 +414,8 @@ export default {
             const totalRetenciones = factura.retentionsSuggested?.reduce((sum, ret) => sum + ret.amount, 0) || 0;
             const totalFacturaAjustado = factura.total - totalRetenciones;
             // Preparar los datos de la factura anidada
+            console.log('esta es la factura anidada mi papa',factura)
+
             const datosFactura = {
               identification: factura.client?.identification,
               fecha_vencimiento: factura.dueDate,
@@ -469,9 +467,7 @@ export default {
         console.error("Error global:", error);
         alert("Ocurrió un error global inesperado al enviar las facturas anidadas.");
       }
-    }
-    ,
-
+    },
 
     limpiarBaseDeDatos() {
       // Vaciar la tabla

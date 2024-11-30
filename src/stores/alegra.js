@@ -115,7 +115,7 @@ export const useFacturaStore = defineStore('factura', {
 
       try {
         console.log('Enviando datos de factura a la API:', preparedFactura);
-        const response = await fetch('https://api.alegra.com/api/v1/invoicess', {
+        const response = await fetch('https://api.alegra.com/api/v1/invoices', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
