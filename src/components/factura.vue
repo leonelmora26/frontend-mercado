@@ -251,9 +251,7 @@ export default {
           this.facturasSimples = facturasSimples;
           this.facturasAnidadas = facturasAnidadas;
 
-          console.log("Rows actualizados con simples y anidadas:", this.rows);
-          console.log("Facturas Simples:", this.facturasSimples);
-          console.log("Facturas Anidadas:", this.facturasAnidadas);
+
         };
 
         reader.readAsText(archivo);
@@ -267,8 +265,8 @@ export default {
       const clienteData = await facturaStore.obtenerClientId(identificacion);
 
       if (clienteData) {
-        console.log('Datos del cliente:', this.cliente); // Para verificar en consola
-        console.log()
+
+
       } else {
         this.cliente = null; // Limpia si no encuentra datos
         console.warn(`No se encontró cliente para la identificación ${identificacion}`);
@@ -296,7 +294,7 @@ export default {
         filas.slice(1).forEach((fila, index) => {
           // Validar que la fila no esté vacía y tenga al menos un dato válido
           if (fila.every(campo => campo.trim() === '')) {
-            console.log(`Línea vacía ignorada: ${index + 2}`); // Mostrar el número de línea ignorada (incluyendo encabezado)
+
             return; // Saltar esta iteración
           }
           const cantidadProducto = parseFloat(fila[3]) || 0;
@@ -337,7 +335,7 @@ export default {
           }
 
         });
-        // console.log('impuestos', this.rows)
+
         // Convertir el objeto de facturas agrupadas en un array para usarlo en la tabla
         this.rows = Object.values(facturasAgrupadas);
       };
@@ -350,56 +348,54 @@ export default {
     },
 
     async enviarFacturaSimples() {
-  const facturasSimples = this.facturasSimples; // Utiliza las facturas separadas previamente
-  if (facturasSimples.length === 0) {
-    alert("No hay facturas simples para enviar. Por favor, carga un archivo CSV primero.");
-    return;
-  }
-
-  try {
-    const responses = await Promise.allSettled(
-      facturasSimples.map(async (factura, index) => {
-        // Calcular total de retenciones
-        const totalRetenciones = factura.retentionsSuggested?.reduce((sum, ret) => sum + ret.amount, 0) || 0;
-        const totalFacturaAjustado = factura.total - totalRetenciones; // Ajustar total
-
-        // Preparar los datos de la factura simple
-        const datosFactura = {
-          identification: factura.client?.identification || factura.identificacion,
-          fecha_vencimiento: factura.dueDate || factura.fecha_vencimiento,
-          fecha_elaboracion: factura.date || factura.fecha_elaboracion,
-          nombre: factura.client?.name || factura.nombre,
-          tax: factura.tax, // Total de impuestos calculados
-          total: totalFacturaAjustado, // Total ajustado con retenciones
-          retentions: factura.retentionsSuggested || [], // Retenciones aplicadas
-          items: factura.items.map((item) => ({
-            codigo: item.codigo_producto,
-            price: item.price,
-            quantity: item.quantity,
-            unit: item.unit,
-            tax: item.tax, // Incluye IVA y otros impuestos
-            total: item.subtotal + item.tax.reduce((sum, t) => sum + t.amount, 0), // Total del ítem
-          })),
-        };
-
-        // Enviar la factura a la API
-        return await facturaStore.enviarFactura(datosFactura);
-      })
-    );
-
-    // Manejar las respuestas
-    responses.forEach((result, index) => {
-      if (result.status === "fulfilled" && result.value?.success) {
-        alert(`Factura simple ${index + 1} enviada exitosamente.`);
-      } else {
+      const facturasSimples = this.facturasSimples;
+      if (facturasSimples.length === 0) {
+        alert("No hay facturas simples para enviar. Por favor, carga un archivo CSV primero.");
+        return;
       }
-    });
-  } catch (error) {
-    console.error("Error global:", error);
-    alert("Ocurrió un error global inesperado al enviar las facturas simples.");
-  }
-}
-,
+
+      try {
+        const responses = await Promise.allSettled(
+          facturasSimples.map(async (factura, index) => {
+            const totalRetenciones = factura.retentionsSuggested?.reduce((sum, ret) => sum + ret.amount, 0) || 0;
+            const totalFacturaAjustado = factura.total - totalRetenciones;
+
+            const datosFactura = {
+              identification: factura.client?.identification || factura.identificacion,
+              fecha_vencimiento: factura.dueDate || factura.fecha_vencimiento,
+              fecha_elaboracion: factura.date || factura.fecha_elaboracion,
+              nombre: factura.client?.name || factura.nombre,
+              tax: factura.tax,
+              total: totalFacturaAjustado,
+              retentions: factura.retentionsSuggested || [],
+              items: factura.items.map((item) => ({
+                codigo: item.codigo_producto,
+                price: item.price,
+                quantity: item.quantity,
+                unit: item.unit,
+                tax: item.tax,
+                total: item.subtotal + item.tax.reduce((sum, t) => sum + t.amount, 0),
+              })),
+            };
+
+            // Asegúrate de devolver la respuesta completa de la API
+            return await facturaStore.enviarFactura(datosFactura);
+          })
+        );
+
+        // Manejar las respuestas
+        responses.forEach((result, index) => {
+          if (result.status === "fulfilled" && result.value?.success === 201) { // Verifica el código de estado
+            alert(`Factura simple enviada exitosamente.`);
+          } else {
+          }
+        });
+      } catch (error) {
+        console.error("Error global:", error);
+        alert("Ocurrió un error global inesperado al enviar las facturas simples.");
+      }
+    }
+    ,
 
     async enviarFacturasAnidadas() {
       if (!this.facturasAnidadas || this.facturasAnidadas.length === 0) {
@@ -414,7 +410,7 @@ export default {
             const totalRetenciones = factura.retentionsSuggested?.reduce((sum, ret) => sum + ret.amount, 0) || 0;
             const totalFacturaAjustado = factura.total - totalRetenciones;
             // Preparar los datos de la factura anidada
-            console.log('esta es la factura anidada mi papa',factura)
+
 
             const datosFactura = {
               identification: factura.client?.identification,
@@ -449,17 +445,14 @@ export default {
         let errores = 0;
         responses.forEach((result, index) => {
           if (result.status === "fulfilled" && result.value?.success) {
-            console.log(`Factura anidada ${index + 1} enviada exitosamente.`);
+
             alert(`Factura anidada ${index + 1} enviada exitosamente.`);
           } else {
             errores++;
-            console.error(`Error al enviar factura anidada ${index + 1}:`, result.reason || result.value?.error);
-            alert(`Error al enviar la factura anidada ${index + 1}: ${result.reason || result.value?.error}`);
           }
         });
 
         if (errores > 0) {
-          alert(`Proceso completado con errores. Se enviaron ${this.facturasAnidadas.length - errores} facturas y fallaron ${errores}.`);
         } else {
           alert("Todas las facturas anidadas fueron enviadas exitosamente.");
         }
