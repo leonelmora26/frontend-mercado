@@ -1,56 +1,65 @@
 <template>
-  <div class="container">
-    <div class="superior">
-      <div class="titulo">Subir Archivo CSV</div>
-      <div>Subir Archivo CSV:</div>
-      <div>
-        <div class="seleccionar">
-          <input type="file" accept=".csv" @change="procesarArchivo" style="display: none;" ref="fileInput">
-          <button @click="abrirSeleccionArchivo" class="btn"
-            style="background-color: #007BFF; font-weight: bold; color: white; width: 25%; height: 30%;">
-            Seleccionar el archivo
-          </button>
-          <div v-if="nombreArchivo">{{ nombreArchivo }}</div>
-          <div v-else>Ningún archivo seleccionado</div>
+  <div>
+    <div class="barra_superrior">sMIKROTECK S.A.S</div>
+
+    <div class="container">
+      <div class="superior">
+
+        <div class="titulo">Subir Archivo CSV</div>
+        <!-- <div>Subir Archivo CSV:</div> -->
+        <div>
+          <div class="seleccionar">
+            <input type="file" accept=".csv" @change="procesarArchivo" style="display: none;" ref="fileInput">
+            <button @click="abrirSeleccionArchivo" class="btn"
+              style="background-color: #007BFF; font-weight: bold; color: white; width: 25%; height: 30%;">
+              Seleccionar el archivo
+            </button>
+            <div v-if="nombreArchivo">{{ nombreArchivo }}</div>
+            <div v-else>Ningún archivo seleccionado</div>
+          </div>
         </div>
-      </div>
 
-      <!-- Botones de acción -->
-      <div class="btn-agregar">
-        <button @click="enviarFacturaSimples" class="btn" style="color: white; width: 18%;">Enviar Facturas
-          Simples</button>
-        <button @click="enviarFacturasAnidadas" class="btn" style="color: white; width: 18%;">Enviar Facturas
-          Anidadas</button>
-        <button @click="limpiarBaseDeDatos" class="btn" style="color: white; width: 18%;">Limpiar Base de Datos</button>
-        <button @click="subirArchivo" class="btn" style="color: white; width: 18%;">Subir</button>
+        <!-- Botones de acción -->
+        <div class="btn-agregar">
+          <button @click="subirArchivo" class="btn" style="color: white; width: 18%;">Subir</button>
 
-      </div>
+          <button @click="enviarFacturaSimples" class="btn" style="color: white; width: 18%;">Enviar Facturas
+            Simples</button>
+          <button @click="enviarFacturasAnidadas" class="btn" style="color: white; width: 18%;">Enviar Facturas
+            Anidada</button>
+          <button @click="limpiarBaseDeDatos" class="btn" style="color: white; width: 18%;">Limpiar Base de
+            Datos</button>
 
-      <!-- Tabla -->
-      <div style="width: 65vw;">
-        <q-table class="my-sticky-virtscroll-table" virtual-scroll flat bordered v-model:pagination="pagination"
-          :rows-per-page-options="[10, 30, 50]" :virtual-scroll-sticky-size-start="48" row-key="name" :rows="rows"
-          :columns="columns">
-          <!-- Columna para el estado -->
-          <template v-slot:body-cell-estado="props">
-            <q-td :props="props">
-              <label v-if="props.row.estado == 1" style="color: green">Activo</label>
-              <label v-else style="color: red">Inactivo</label>
-            </q-td>
-          </template>
+        </div>
 
-          <!-- Columna para las opciones de editar/activar/inactivar -->
-          <template v-slot:body-cell-opciones="props">
-            <q-td :props="props" class="botones">
-              <button @click="imprimirTicket(props.row)" class="edi">
-                <i class="fa-solid fa-print"></i>
-              </button>
-            </q-td>
-          </template>
-        </q-table>
+        <!-- Tabla -->
+        <div style="width: 65vw;">
+          <q-table class="my-sticky-virtscroll-table" virtual-scroll flat bordered v-model:pagination="pagination"
+            :rows-per-page-options="[10, 30, 50]" :virtual-scroll-sticky-size-start="48" row-key="name" :rows="rows"
+            :columns="columns">
+            <!-- Columna para el estado -->
+            <template v-slot:body-cell-estado="props">
+              <q-td :props="props">
+                <label v-if="props.row.estado == 1" style="color: green">Activo</label>
+                <label v-else style="color: red">Inactivo</label>
+              </q-td>
+            </template>
+
+            <!-- Columna para las opciones de editar/activar/inactivar -->
+            <template v-slot:body-cell-opciones="props">
+              <q-td :props="props" class="botones">
+                <button @click="imprimirTicket(props.row)" class="edi">
+                  <i class="fa-solid fa-print"></i>
+                </button>
+              </q-td>
+            </template>
+          </q-table>
+        </div>
       </div>
     </div>
   </div>
+  <!-- <div class="supa">sMIKROTECK S.A.S</div>  -->
+
 </template>
 
 <script>
@@ -114,14 +123,14 @@ export default {
       valor_retencion = isNaN(valor_retencion) ? 0 : parseFloat(valor_retencion);
 
       const valorBruto = cantidadProducto * valor_unitario;
-      let descuento = 0;
+      let descuentoiva = 0;
       // Si el código de impuesto es 3, aplicar el cálculo especial
       if (iva === 3) {
-        descuento = (valorBruto * 19) / 100;
+        descuentoiva = (valorBruto * 19) / 100;
       } else {
-        descuento = (valorBruto * iva) / 100;
+        descuentoiva = (valorBruto * iva) / 100;
       }
-      const total = valorBruto + descuento - valorReteica - valor_retencion;
+      const total = valorBruto + descuentoiva - valorReteica - valor_retencion;
       return total.toFixed(0);  // Retornar sin decimales
     },
 
@@ -148,14 +157,20 @@ export default {
 
           // Convertir filas en objetos usando encabezados
           for (let i = 1; i < filas.length; i++) {
-            const columnas = filas[i].split(";");
-            const objeto = {};
+            const columnas = filas[i].split(";").map(col => col.trim());
 
+            // Ignorar filas vacías o filas que contienen solo encabezados
+            if (columnas.every(col => col === "") || columnas[0] === encabezados[0].trim()) {
+              continue;
+            }
+
+            const objeto = {};
             encabezados.forEach((header, index) => {
-              objeto[header.trim()] = columnas[index]?.trim();
+              objeto[header.trim()] = columnas[index] || "";
             });
             datos.push(objeto);
           }
+
 
           // Crear listas separadas para facturas simples y anidadas
           const facturasSimples = [];
@@ -165,10 +180,9 @@ export default {
           datos.forEach((dato) => {
             const identificacion = dato["Identificación tercero"]?.trim();
 
-            // Obtener valores desde el archivo
             const precioUnitario = parseFloat(dato["Valor unitario"] || 0);
             const cantidad = parseInt(dato["Cantidad producto"] || 0, 10);
-            const descuento = parseFloat(dato["Código impuesto cargo"] || 0);
+            const descuentoiva = parseFloat(dato["Código impuesto cargo"] || 0);
             const reteicaPorcentaje = parseFloat(dato["Reteica"] || 0);
             const retencion = parseFloat(dato["Valor Retencion"] || 0); // Valor directo de la retención
 
@@ -176,16 +190,18 @@ export default {
             const valorBruto = precioUnitario * cantidad;
             let iva = 0;
 
-            if (descuento === 3) {
+            if (descuentoiva === 3) {
               iva = (valorBruto * 19) / 100;
             } else {
-              iva = (valorBruto * descuento) / 100;
+              iva = (valorBruto * descuentoiva) / 100;
             }
 
             // Calcular total del ítem: valor bruto + IVA
             const totalItem = valorBruto + iva;
+            const descuento = parseFloat(dato["Porcentaje Descuento"] || 0);
+            const descuentoValor = (valorBruto * descuento) / 100;
+            const subtotalConDescuento = valorBruto - descuentoValor;
 
-            // Crear un objeto para el producto actual
             const producto = {
               codigo_producto: dato["Código producto"] || "Producto sin nombre",
               price: precioUnitario,
@@ -195,8 +211,10 @@ export default {
                 { type: "IVA", amount: iva || 0 },
                 { type: "Reteica", amount: (valorBruto * reteicaPorcentaje) / 100 || 0 },
               ],
-              subtotal: valorBruto,
-              total: totalItem, // Total del ítem sin restar la retención
+              subtotal: subtotalConDescuento,
+              total: Math.round(subtotalConDescuento + iva),
+              descuento: descuento,
+              anidar: dato.Anidar?.trim().toLowerCase() === 'true' ? 'true' : 'false',
             };
 
             // Verificar si la factura ya existe
@@ -228,30 +246,64 @@ export default {
             // Agregar retenciones a nivel de factura
             if (retencion > 0) {
               facturasUnicas[identificacion].retentionsSuggested.push({
-                id: `14`, // Generar un ID único
+                id: `14`,  // Genera un ID o usa el correcto de tu sistema
                 amount: retencion,
-                percentage: ((retencion / valorBruto) * 100).toFixed(2), // Calcular porcentaje
+                percentage: ((retencion / valorBruto) * 100).toFixed(2),
               });
             }
           });
 
-          // Ajustar el total de cada factura restando las retenciones
+          // Consolidar retenciones y ajustar el total
           Object.values(facturasUnicas).forEach((factura) => {
+            // Calcular la suma total de retenciones
             const totalRetenciones = factura.retentionsSuggested.reduce((sum, ret) => sum + ret.amount, 0);
-            factura.total -= totalRetenciones;  // Restar retenciones del total final
 
-            if (factura.items.length > 1) {
+            // Reemplazar con una sola retención consolidada
+            factura.retentionsSuggested = [];
+            if (totalRetenciones > 0) {
+              factura.retentionsSuggested.push({
+                id: `14`,  // Usa el ID correcto o genera uno
+                amount: totalRetenciones,
+                percentage: ((totalRetenciones / factura.subtotal) * 100).toFixed(2),
+              });
+            }
+
+            // Ajustar el total restando las retenciones consolidadas
+            factura.total -= totalRetenciones;
+
+            // Filtrar ítems con anidar: "true" o "false"
+            const itemsAnidarTrue = factura.items.filter(item => item.anidar === 'true');
+            const itemsAnidarFalse = factura.items.filter(item => item.anidar === 'false');
+
+            if (itemsAnidarFalse.length > 0) {
+              const facturaSimple = {
+                ...factura,
+                items: itemsAnidarFalse,
+                subtotal: itemsAnidarFalse.reduce((sum, item) => sum + item.subtotal, 0),
+                total: itemsAnidarFalse.reduce((sum, item) => sum + item.total, 0),
+                tax: itemsAnidarFalse.reduce((sum, item) => sum + item.tax.reduce((subsum, t) => subsum + t.amount, 0), 0),
+              };
+              facturasSimples.push(facturaSimple);
+              factura.items = itemsAnidarTrue;
+            }
+
+            if (factura.items.length > 0) {
+              factura.subtotal = factura.items.reduce((sum, item) => sum + item.subtotal, 0);
+              factura.total = factura.items.reduce((sum, item) => sum + item.total, 0);
+              factura.tax = factura.items.reduce((sum, item) => sum + item.tax.reduce((subsum, t) => subsum + t.amount, 0), 0);
               facturasAnidadas.push(factura);
-            } else {
-              facturasSimples.push(factura);
             }
           });
+          // Ordenar facturas alfabéticamente por nombre de cliente
+          facturasSimples.sort((a, b) => a.client.name.localeCompare(b.client.name));
+          facturasAnidadas.sort((a, b) => a.client.name.localeCompare(b.client.name));
 
           // Actualizar el estado con las facturas procesadas
           this.facturasSimples = facturasSimples;
           this.facturasAnidadas = facturasAnidadas;
 
-
+          console.log('this.facturasSimples', this.facturasSimples);
+          console.log('this.facturasAnidadas', this.facturasAnidadas);
         };
 
         reader.readAsText(archivo);
@@ -259,6 +311,7 @@ export default {
         this.nombreArchivo = "";
       }
     },
+
 
     async obtenerDatosCliente(identificacion) {
       const facturaStore = useFacturaStore();
@@ -347,6 +400,7 @@ export default {
       return await facturaStore.obtenerClientId();
     },
 
+
     async enviarFacturaSimples() {
       const facturasSimples = this.facturasSimples;
       if (facturasSimples.length === 0) {
@@ -369,6 +423,7 @@ export default {
               total: totalFacturaAjustado,
               retentions: factura.retentionsSuggested || [],
               items: factura.items.map((item) => ({
+                descuento: item.descuento,
                 codigo: item.codigo_producto,
                 price: item.price,
                 quantity: item.quantity,
@@ -377,7 +432,6 @@ export default {
                 total: item.subtotal + item.tax.reduce((sum, t) => sum + t.amount, 0),
               })),
             };
-
             // Asegúrate de devolver la respuesta completa de la API
             return await facturaStore.enviarFactura(datosFactura);
           })
@@ -394,8 +448,7 @@ export default {
         console.error("Error global:", error);
         alert("Ocurrió un error global inesperado al enviar las facturas simples.");
       }
-    }
-    ,
+    },
 
     async enviarFacturasAnidadas() {
       if (!this.facturasAnidadas || this.facturasAnidadas.length === 0) {
@@ -406,11 +459,13 @@ export default {
       try {
         const responses = await Promise.allSettled(
           this.facturasAnidadas.map(async (factura, index) => {
+            console.log('la facturaa', factura)
             // Calcular total de impuestos y retenciones
             const totalRetenciones = factura.retentionsSuggested?.reduce((sum, ret) => sum + ret.amount, 0) || 0;
             const totalFacturaAjustado = factura.total - totalRetenciones;
             // Preparar los datos de la factura anidada
 
+            console.log('antes de datos factura', factura)
 
             const datosFactura = {
               identification: factura.client?.identification,
@@ -426,6 +481,7 @@ export default {
                 const itemTotal = item.subtotal + item.tax.reduce((sum, t) => sum + t.amount, 0);
 
                 return {
+                  descuento: item.descuento,
                   codigo: item.codigo_producto,
                   price: item.price,
                   quantity: item.quantity,
@@ -435,6 +491,7 @@ export default {
                 };
               }),
             };
+            console.log('datosFactura', factura)
 
             // Enviar la factura a la API
             return await facturaStore.enviarFactura(datosFactura);
@@ -769,11 +826,17 @@ export default {
 
 <style scoped>
 .container {
-  height: 100vh;
   display: flex;
   justify-content: center;
-  padding: 8%;
-  /* Asegúrate de que el contenedor ocupe el 100% del ancho */
+  padding: 6%;
+  /* Asegúrate de que el contenedo  |r ocupe el 100% del ancho */
+}
+
+.barra_superrior {
+  background: -webkit-linear-gradient(bottom, #b95b5b, #d34646);
+  --tw-bg-opacity: 1;
+  height: 30%;
+  color: whitesmoke;
 }
 
 .titulo {

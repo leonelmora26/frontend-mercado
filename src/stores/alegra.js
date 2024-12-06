@@ -23,6 +23,14 @@ export const useFacturaStore = defineStore('factura', {
 
     // Procesar la cola de facturas
     async procesarCola() {
+      // Ordena la cola de facturas pendientes alfabéticamente por nombre del cliente
+      this.facturasPendientes.sort((a, b) => {
+        const nombreA = a.client?.name?.toLowerCase() || '';
+        const nombreB = b.client?.name?.toLowerCase() || '';
+        return nombreA.localeCompare(nombreB);
+      });
+      console.log("Facturas ordenadas alfabéticamente:", JSON.parse(JSON.stringify(this.facturasPendientes)));
+
       while (this.facturasPendientes.length > 0 && !this.isSending) {
         this.isSending = true;
         const facturaData = this.facturasPendientes.shift(); // Saca la primera factura en la cola
@@ -78,7 +86,7 @@ export const useFacturaStore = defineStore('factura', {
               price: item.price || itemData.price[0]?.price || 0,
               quantity: item.quantity || 1,
               unit: item.unit || "service",
-              discount: item.discount || 0,
+              discount: item.descuento || 0,
               tax: iva > 0 ? [{ id: 3, amount: iva }] : [],
             };
           } catch (error) {
@@ -139,7 +147,7 @@ export const useFacturaStore = defineStore('factura', {
 
     prepararFactura(facturaData) {
       const preparedFactura = {
-        client: { 
+        client: {
           id: facturaData.client_id,
           name: facturaData.nombre,
           identification: facturaData.identification,
@@ -163,7 +171,8 @@ export const useFacturaStore = defineStore('factura', {
         termsConditions: "Esta factura se asimila en todos sus efectos a una letra de cambio de conformidad con el Art. 774 del código de comercio. Autorizo que en caso de incumplimiento de esta obligación sea reportado a las centrales de riesgo, Recargo por mora y reconexión de $5.000 el cual se vera reflejado en la siguiente facturación. MIKROTECK SAS. Empresa autorizada y vigilada por el MINTIC. Registro TIC 96003535\n",
         total: facturaData.total || 0,
       };
-    
+
+
       console.log("Factura preparada:", preparedFactura);
       return preparedFactura;
     },
