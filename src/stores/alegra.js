@@ -10,71 +10,87 @@ export const useFacturaStore = defineStore('factura', {
 
   actions: {
     // Función principal para añadir facturas a la cola y procesarlas
-    async enviarFactura(facturaData) {
+     // Función principal para añadir facturas a la cola y procesarlas
+     async enviarFactura(facturaData) {
       if (!facturaData || !facturaData.identification || !facturaData.items || facturaData.items.length === 0) {
-        console.error("Datos incompletos para la factura:", facturaData);
+      // console.error("Datos incompletos para la factura:", facturaData);
         return { success: false, error: "Datos incompletos para la factura" };
       }
 
-      console.log('Factura recibida para enviar:', facturaData);
+    // console.log("Factura recibida para enviar:", facturaData);
       this.facturasPendientes.push(facturaData); // Añadir factura a la cola
-      await this.procesarCola(); // Intentar procesar la cola
+
+      // Procesar la cola y esperar la respuesta
+      const result = await this.procesarCola();
+      return result;
     },
 
     // Procesar la cola de facturas
     async procesarCola() {
-      // Ordena la cola de facturas pendientes alfabéticamente por nombre del cliente
+    // console.log("Procesando archivos..."); // Mensaje al iniciar el procesamiento
       this.facturasPendientes.sort((a, b) => {
-        const nombreA = a.client?.name?.toLowerCase() || '';
-        const nombreB = b.client?.name?.toLowerCase() || '';
+        const nombreA = a.client?.name?.toLowerCase() || "";
+        const nombreB = b.client?.name?.toLowerCase() || "";
         return nombreA.localeCompare(nombreB);
       });
-      console.log("Facturas ordenadas alfabéticamente:", JSON.parse(JSON.stringify(this.facturasPendientes)));
+
+    // console.log(
+    //     "Facturas ordenadas alfabéticamente:",
+    //     JSON.parse(JSON.stringify(this.facturasPendientes))
+    //   );
+
+      const results = []; // Arreglo para almacenar resultados de cada factura
 
       while (this.facturasPendientes.length > 0 && !this.isSending) {
         this.isSending = true;
         const facturaData = this.facturasPendientes.shift(); // Saca la primera factura en la cola
-        console.log('Procesando factura:', facturaData);
+      // console.log("Procesando factura:", facturaData);
 
         try {
           // Paso 1: Obtener client_id
           const clientId = await this.obtenerClientId(facturaData.identification);
-          console.log('clientId obtenido:', clientId);
+        // console.log("clientId obtenido:", clientId);
           if (!clientId) {
             throw new Error("No se pudo obtener client_id para el cliente.");
           }
 
           facturaData.client_id = clientId;
-          facturaData.date = facturaData.fecha_elaboracion || '';
-          facturaData.dueDate = facturaData.fecha_vencimiento || '';
+          facturaData.date = facturaData.fecha_elaboracion || "";
+          facturaData.dueDate = facturaData.fecha_vencimiento || "";
 
           // Paso 2: Procesar los ítems
           facturaData.items = await this.procesarItems(facturaData.items);
 
           // Paso 3: Preparar y enviar la factura
           const preparedFactura = this.prepararFactura(facturaData);
-          console.log('Factura preparada para enviar:', preparedFactura);
+        console.log("Factura preparada para enviar:", preparedFactura);
 
           const response = await this.enviarDatosAFactura(preparedFactura);
-          console.log('Respuesta del envío de la factura:', response);
+        console.log("Respuesta del envío de la factura:", response);
 
-          this.facturaResponse = response.success
-            ? { success: true, response: response.result }
-            : { success: false, error: response.error };
+          results.push(response); // Almacenar la respuesta de esta factura
         } catch (error) {
-          console.error("Error en el proceso de envío de factura:", error.message);
-          this.facturaResponse = { success: false, error: error.message };
+        console.error("Error en el proceso de envío de factura:", error.message);
+          results.push({ success: false, error: error.message });
         } finally {
           this.isSending = false; // Liberar el flag
         }
       }
+
+      if (results.every((res) => res.success)) {
+      console.log("Proceso exitoso"); // Mensaje cuando todas las facturas se procesan correctamente
+      } else {
+      console.log("Proceso completado con algunos errores.");
+      }
+
+      return results; // Retorna los resultados de todas las facturas procesadas
     },
 
     async procesarItems(items) {
       return await Promise.all(
         items.map(async (item) => {
           try {
-            console.log('Procesando ítem:', item);
+          // console.log("Procesando ítem:", item);
             const itemData = await this.obtenerItem(item.codigo);
             if (!itemData) throw new Error(`Ítem no encontrado: ${item.codigo}`);
 
@@ -90,18 +106,17 @@ export const useFacturaStore = defineStore('factura', {
               tax: iva > 0 ? [{ id: 3, amount: iva }] : [],
             };
           } catch (error) {
-            console.error("Error al procesar ítem:", error.message);
+          // console.error("Error al procesar ítem:", error.message);
             return null; // Opcional: Maneja qué hacer con ítems inválidos
           }
         })
       );
     },
-
     async obtenerItem(codigoProducto) {
       const API_KEY = import.meta.env.VITE_ALEGRA_API_KEY;
 
       try {
-        console.log('Buscando ítem con código:', codigoProducto);
+      // console.log('Buscando ítem con código:', codigoProducto);
         const response = await fetch(`https://api.alegra.com/api/v1/items?query=${codigoProducto}`, {
           method: 'GET',
           headers: {
@@ -110,10 +125,10 @@ export const useFacturaStore = defineStore('factura', {
           },
         });
         const data = await response.json();
-        console.log('Respuesta de la API para ítem:', data);
+      // console.log('Respuesta de la API para ítem:', data);
         return data.find(i => i.reference === codigoProducto) || null;
       } catch (error) {
-        console.error("Error al obtener item_id:", error.message);
+      // console.error("Error al obtener item_id:", error.message);
         return null;
       }
     },
@@ -122,7 +137,7 @@ export const useFacturaStore = defineStore('factura', {
       const API_KEY = import.meta.env.VITE_ALEGRA_API_KEY;
 
       try {
-        console.log('Enviando datos de factura a la API:', preparedFactura);
+      // console.log('Enviando datos de factura a la API:', preparedFactura);
         const response = await fetch('https://api.alegra.com/api/v1/invoices', {
           method: 'POST',
           headers: {
@@ -133,14 +148,14 @@ export const useFacturaStore = defineStore('factura', {
           body: JSON.stringify(preparedFactura),
         });
         const result = await response.json();
-        console.log('Respuesta de la API al enviar factura:', result);
+      // console.log('Respuesta de la API al enviar factura:', result);
 
         if (!response.ok) {
           throw new Error(result.error || "Error desconocido al enviar la factura.");
         }
         return { success: true, result };
       } catch (error) {
-        console.error("Error al enviar la factura:", error.message);
+      // console.error("Error al enviar la factura:", error.message);
         return { success: false, error: error.message };
       }
     },
@@ -173,7 +188,7 @@ export const useFacturaStore = defineStore('factura', {
       };
 
 
-      console.log("Factura preparada:", preparedFactura);
+    // console.log("Factura preparada:", preparedFactura);
       return preparedFactura;
     },
 
@@ -181,7 +196,7 @@ export const useFacturaStore = defineStore('factura', {
       const API_KEY = import.meta.env.VITE_ALEGRA_API_KEY;
 
       try {
-        console.log('Buscando clientId para identificación:', identification);
+      // console.log('Buscando clientId para identificación:', identification);
         const response = await fetch(`https://api.alegra.com/api/v1/contacts?identification=${identification}`, {
           method: 'GET',
           headers: {
@@ -190,10 +205,10 @@ export const useFacturaStore = defineStore('factura', {
           },
         });
         const data = await response.json();
-        console.log('Respuesta de la API para clientId:', data);
+      // console.log('Respuesta de la API para clientId:', data);
         return data[0]?.id || null;
       } catch (error) {
-        console.error("Error al obtener client_id:", error.message);
+      // console.error("Error al obtener client_id:", error.message);
         return null;
       }
     },

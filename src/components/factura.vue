@@ -1,6 +1,6 @@
 <template>
-  <div>
-    <div class="barra_superrior">sMIKROTECK S.A.S</div>
+  <div style="height: 100vh;">
+    <div class="barra_superrior">MIKROTECK S.A.S</div>
 
     <div class="container">
       <div class="superior">
@@ -74,6 +74,7 @@ import pedido from "../assets/tabla-de-pedido.png"
 import escanear from "../assets/escanear.png"
 import { useFacturaStore } from "../stores/alegra.js"
 import { createPinia } from 'pinia'
+import { Notify } from 'quasar';
 
 const pinia = createPinia();
 const facturaStore = useFacturaStore(pinia);
@@ -92,7 +93,6 @@ export default {
         { name: 'codigo_producto', label: 'Código', align: 'left', field: 'codigo_producto' },
         { name: 'fecha_vencimiento ', label: 'Fecha Vencimiento', align: 'left', field: 'fecha_vencimiento' },
         { name: 'fecha_elaboracion ', label: 'Fecha Elaboracion', align: 'left', field: 'fecha_elaboracion' },
-        { name: 'anidar ', label: 'Anidar', align: 'left', field: 'anidar' },
 
         {
           name: "opciones",
@@ -217,41 +217,61 @@ export default {
               anidar: dato.Anidar?.trim().toLowerCase() === 'true' ? 'true' : 'false',
             };
 
-            // Verificar si la factura ya existe
-            if (!facturasUnicas[identificacion]) {
-              facturasUnicas[identificacion] = {
+            if (producto.anidar === 'false') {
+              // Crear una nueva factura simple directamente
+              const facturaSimple = {
                 id: dato["Id factura"] || null,
                 date: dato["Fecha de elaboración"],
                 dueDate: dato["FechaVencimiento"],
                 client: {
                   name: dato["Nombre contacto"],
-                  identification: dato["Identificación tercero"],
+                  identification: identificacion,
                 },
-                subtotal: 0,
-                tax: 0,
-                total: 0,
-                retentionsSuggested: [], // Retenciones a nivel de factura
-                items: [],
+                subtotal: valorBruto,
+                tax: iva,
+                total: totalItem,
+                retentionsSuggested: retencion > 0 ? [{
+                  id: `14`,  // Usa el ID correcto o genera uno
+                  amount: retencion,
+                  percentage: ((retencion / valorBruto) * 100).toFixed(2),
+                }] : [],
+                items: [producto],
               };
-            }
+              facturasSimples.push(facturaSimple);
+            } else {
+              // Procesar facturas anidadas
+              if (!facturasUnicas[identificacion]) {
+                facturasUnicas[identificacion] = {
+                  id: dato["Id factura"] || null,
+                  date: dato["Fecha de elaboración"],
+                  dueDate: dato["FechaVencimiento"],
+                  client: {
+                    name: dato["Nombre contacto"],
+                    identification: identificacion,
+                  },
+                  subtotal: 0,
+                  tax: 0,
+                  total: 0,
+                  retentionsSuggested: [],
+                  items: [],
+                };
+              }
 
-            // Agregar el producto a la factura
-            facturasUnicas[identificacion].items.push(producto);
+              facturasUnicas[identificacion].items.push(producto);
+              facturasUnicas[identificacion].subtotal += valorBruto;
+              facturasUnicas[identificacion].tax += iva;
+              facturasUnicas[identificacion].total += totalItem;
 
-            // Actualizar subtotales y totales
-            facturasUnicas[identificacion].subtotal += valorBruto;
-            facturasUnicas[identificacion].tax += iva;
-            facturasUnicas[identificacion].total += totalItem;
-
-            // Agregar retenciones a nivel de factura
-            if (retencion > 0) {
-              facturasUnicas[identificacion].retentionsSuggested.push({
-                id: `14`,  // Genera un ID o usa el correcto de tu sistema
-                amount: retencion,
-                percentage: ((retencion / valorBruto) * 100).toFixed(2),
-              });
+              if (retencion > 0) {
+                facturasUnicas[identificacion].retentionsSuggested.push({
+                  id: `14`,  // Usa el ID correcto o genera uno
+                  amount: retencion,
+                  percentage: ((retencion / valorBruto) * 100).toFixed(2),
+                });
+              }
             }
           });
+
 
           // Consolidar retenciones y ajustar el total
           Object.values(facturasUnicas).forEach((factura) => {
@@ -326,7 +346,6 @@ export default {
       }
     },
 
-
     async subirArchivo() {
       const archivo = this.$refs.fileInput.files[0];
       if (!archivo) {
@@ -340,15 +359,13 @@ export default {
         const contenido = datos.target.result;
         const filas = contenido.split('\n').map(fila => fila.split(';'));
 
-        // Crear un objeto para almacenar facturas agrupadas por 'identificacion'
-        const facturasAgrupadas = {};
+        // Crear un array para almacenar las facturas simples y anidadas
+        const facturasSimples = [];
+        const facturasAnidadas = {};
 
-        // Ignorar el encabezado y convertir las filas en un objeto para usar en la tabla
         filas.slice(1).forEach((fila, index) => {
-          // Validar que la fila no esté vacía y tenga al menos un dato válido
           if (fila.every(campo => campo.trim() === '')) {
-
-            return; // Saltar esta iteración
+            return; // Saltar filas vacías
           }
           const cantidadProducto = parseFloat(fila[3]) || 0;
           const valor_unitario = parseFloat(fila[4]) || 0;
@@ -356,42 +373,47 @@ export default {
           const valorReteica = parseFloat(fila[9]) || 0;
           const valor_retencion = parseFloat(fila[7]) || 0;
 
-          const identificacion = fila[1];  // Suponemos que la identificacion está en la columna 1
-          const nombre = fila[0];  // Suponemos que el nombre está en la columna 0
+          const identificacion = fila[1]; // Identificación
+          const nombre = fila[0]; // Nombre del cliente
           const codigo_producto = fila[2];
           const fecha_vencimiento = fila[11];
           const fecha_elaboracion = fila[12];
-          const anidar = fila[13] || '';
+          const anidar = fila[13]?.trim().toLowerCase() === 'true';
 
-          // Si ya existe una factura con esta 'identificacion', sumamos los valores
-          if (facturasAgrupadas[identificacion]) {
-            // Si ya existe, actualizamos los valores
-            facturasAgrupadas[identificacion].cantidadProducto += cantidadProducto;
-            facturasAgrupadas[identificacion].valor_unitario += valor_unitario; // Dependiendo de la lógica que necesites
-            facturasAgrupadas[identificacion].total += this.calcularTotal(cantidadProducto, valor_unitario, iva, valorReteica, valor_retencion);
+          const factura = {
+            nombre,
+            identificacion,
+            codigo_producto,
+            cantidadProducto,
+            valor_unitario,
+            iva,
+            valor_retencion,
+            valorReteica,
+            fecha_vencimiento,
+            fecha_elaboracion,
+            total: this.calcularTotal(cantidadProducto, valor_unitario, iva, valorReteica, valor_retencion),
+          };
+
+          if (!anidar) {
+            // Facturas simples: agregarlas directamente
+            facturasSimples.push(factura);
           } else {
-            // Si es una factura nueva, la agregamos
-            facturasAgrupadas[identificacion] = {
-              nombre,
-              identificacion,
-              codigo_producto,
-              cantidadProducto,
-              valor_unitario,
-              iva,
-              valor_retencion,
-              valorReteica,
-              fecha_vencimiento,
-              fecha_elaboracion,
-              anidar,
-              total: this.calcularTotal(cantidadProducto, valor_unitario, iva, valorReteica, valor_retencion),
-            };
+            // Facturas anidadas: agrupar por identificación
+            if (!facturasAnidadas[identificacion]) {
+              facturasAnidadas[identificacion] = { ...factura, items: [] };
+            }
+            facturasAnidadas[identificacion].items.push(factura);
+            facturasAnidadas[identificacion].total += factura.total;
           }
-
         });
 
-        // Convertir el objeto de facturas agrupadas en un array para usarlo en la tabla
-        this.rows = Object.values(facturasAgrupadas);
+        // Combinar las facturas simples y las anidadas para mostrar en la tabla
+        this.rows = [
+          ...facturasSimples,
+          ...Object.values(facturasAnidadas),
+        ];
       };
+
 
       reader.onerror = (error) => {
         // console.error("Error al leer el archivo:", error);
@@ -400,7 +422,13 @@ export default {
       return await facturaStore.obtenerClientId();
     },
 
+    mostrarNotificacion(){
+      Notify.create({
+        message: 'Documento enviado',
+        color: 'positive',
+      })
 
+    },
     async enviarFacturaSimples() {
       const facturasSimples = this.facturasSimples;
       if (facturasSimples.length === 0) {
@@ -408,12 +436,23 @@ export default {
         return;
       }
 
+      // Notificación de "Procesando archivo"
+      const processingNotification = Notify.create({
+        type: "info",
+        message: "Procesando archivos, por favor espera...",
+        spinner: true,
+        position: "bottom",
+        timeout: 1000, // La notificación no se cerrará automáticamente
+      });
+
       try {
         const responses = await Promise.allSettled(
           facturasSimples.map(async (factura, index) => {
+            // Calcular total ajustado con retenciones
             const totalRetenciones = factura.retentionsSuggested?.reduce((sum, ret) => sum + ret.amount, 0) || 0;
             const totalFacturaAjustado = factura.total - totalRetenciones;
 
+            // Preparar datos de la factura
             const datosFactura = {
               identification: factura.client?.identification || factura.identificacion,
               fecha_vencimiento: factura.dueDate || factura.fecha_vencimiento,
@@ -432,23 +471,29 @@ export default {
                 total: item.subtotal + item.tax.reduce((sum, t) => sum + t.amount, 0),
               })),
             };
-            // Asegúrate de devolver la respuesta completa de la API
+
+            // Agregar un log para verificar los datos de la factura
+            console.log(`Preparando datos de la factura #${index + 1}:`, datosFactura);
+
             return await facturaStore.enviarFactura(datosFactura);
           })
         );
-
-        // Manejar las respuestas
-        responses.forEach((result, index) => {
-          if (result.status === "fulfilled" && result.value?.success === 201) { // Verifica el código de estado
-            alert(`Factura simple enviada exitosamente.`);
-          } else {
-          }
-        });
-      } catch (error) {
-        console.error("Error global:", error);
-        alert("Ocurrió un error global inesperado al enviar las facturas simples.");
+        
+     this.mostrarNotificacion()
+     console.log(responses)
+     responses.forEach((result, index) =>{
+      if (result.status === "fulfilled" && result.value?.success=== 201){
+        alert ('Proceso Exitoso.');
+      }else{
       }
-    },
+     });
+
+      } catch (error) {
+        console.error("Error global inesperado:", error);
+        alert("Ocurrió un error Global Inesperado al enviar las facturas simples.")
+      } 
+    }
+    ,
 
     async enviarFacturasAnidadas() {
       if (!this.facturasAnidadas || this.facturasAnidadas.length === 0) {
@@ -499,24 +544,19 @@ export default {
         );
 
         // Procesar los resultados
-        let errores = 0;
-        responses.forEach((result, index) => {
-          if (result.status === "fulfilled" && result.value?.success) {
-
-            alert(`Factura anidada ${index + 1} enviada exitosamente.`);
-          } else {
-            errores++;
-          }
-        });
-
-        if (errores > 0) {
-        } else {
-          alert("Todas las facturas anidadas fueron enviadas exitosamente.");
-        }
-      } catch (error) {
-        console.error("Error global:", error);
-        alert("Ocurrió un error global inesperado al enviar las facturas anidadas.");
+        this.mostrarNotificacion()
+     console.log(responses)
+     responses.forEach((result, index) =>{
+      if (result.status === "fulfilled" && result.value?.success=== 201){
+        alert ('Proceso Exitoso.');
+      }else{
       }
+     });
+
+      } catch (error) {
+        console.error("Error global inesperado:", error);
+        alert("Ocurrió un error Global Inesperado al enviar las facturas simples.")
+      } 
     },
 
     limpiarBaseDeDatos() {
@@ -835,8 +875,11 @@ export default {
 .barra_superrior {
   background: -webkit-linear-gradient(bottom, #b95b5b, #d34646);
   --tw-bg-opacity: 1;
-  height: 30%;
+  height: 5%;
   color: whitesmoke;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .titulo {
