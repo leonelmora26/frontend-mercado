@@ -355,7 +355,7 @@ export default {
 
       const reader = new FileReader();
 
-      reader.onload = (datos) => {
+      reader.onload = async (datos) => {
         const contenido = datos.target.result;
         const filas = contenido.split('\n').map(fila => fila.split(';'));
 
@@ -363,10 +363,11 @@ export default {
         const facturasSimples = [];
         const facturasAnidadas = {};
 
-        filas.slice(1).forEach((fila, index) => {
+        for (const fila of filas.slice(1)) {
           if (fila.every(campo => campo.trim() === '')) {
-            return; // Saltar filas vacías
+            continue; // Saltar filas vacías
           }
+
           const cantidadProducto = parseFloat(fila[3]) || 0;
           const valor_unitario = parseFloat(fila[4]) || 0;
           const iva = parseFloat(fila[5]) || 0;
@@ -380,6 +381,10 @@ export default {
           const fecha_elaboracion = fila[12];
           const anidar = fila[13]?.trim().toLowerCase() === 'true';
 
+          // Obtener información adicional del cliente
+          const clientInfo = await facturaStore.obtenerClientId(identificacion);
+          console.log('cliente de identificacion', clientInfo)
+
           const factura = {
             nombre,
             identificacion,
@@ -392,6 +397,9 @@ export default {
             fecha_vencimiento,
             fecha_elaboracion,
             total: this.calcularTotal(cantidadProducto, valor_unitario, iva, valorReteica, valor_retencion),
+            direccion: clientInfo.address.address || null,
+            email: clientInfo?.email || null,
+            telefono: clientInfo?.phone || null,
           };
 
           if (!anidar) {
@@ -405,7 +413,7 @@ export default {
             facturasAnidadas[identificacion].items.push(factura);
             facturasAnidadas[identificacion].total += factura.total;
           }
-        });
+        }
 
         // Combinar las facturas simples y las anidadas para mostrar en la tabla
         this.rows = [
@@ -414,21 +422,22 @@ export default {
         ];
       };
 
-
       reader.onerror = (error) => {
-        // console.error("Error al leer el archivo:", error);
+        console.error("Error al leer el archivo:", error);
       };
-      reader.readAsText(archivo);
-      return await facturaStore.obtenerClientId();
-    },
 
-    mostrarNotificacion(){
+      reader.readAsText(archivo);
+    }
+    ,
+
+    mostrarNotificacion() {
       Notify.create({
         message: 'Documento enviado',
         color: 'positive',
       })
 
     },
+
     async enviarFacturaSimples() {
       const facturasSimples = this.facturasSimples;
       if (facturasSimples.length === 0) {
@@ -436,13 +445,12 @@ export default {
         return;
       }
 
-      // Notificación de "Procesando archivo"
       const processingNotification = Notify.create({
         type: "info",
         message: "Procesando archivos, por favor espera...",
         spinner: true,
         position: "bottom",
-        timeout: 1000, // La notificación no se cerrará automáticamente
+        timeout: 3000, // La notificación no se cerrará automáticamente
       });
 
       try {
@@ -478,29 +486,34 @@ export default {
             return await facturaStore.enviarFactura(datosFactura);
           })
         );
-        
-     this.mostrarNotificacion()
-     console.log(responses)
-     responses.forEach((result, index) =>{
-      if (result.status === "fulfilled" && result.value?.success=== 201){
-        alert ('Proceso Exitoso.');
-      }else{
-      }
-     });
+
+        this.mostrarNotificacion()
+        console.log(responses)
+        responses.forEach((result, index) => {
+          if (result.status === "fulfilled" && result.value?.success === 201) {
+            alert('Proceso Exitoso.');
+          } else {
+          }
+        });
 
       } catch (error) {
         console.error("Error global inesperado:", error);
         alert("Ocurrió un error Global Inesperado al enviar las facturas simples.")
-      } 
-    }
-    ,
+      }
+    },
 
     async enviarFacturasAnidadas() {
       if (!this.facturasAnidadas || this.facturasAnidadas.length === 0) {
         alert("No hay facturas anidadas para enviar. Por favor, verifica el archivo CSV.");
         return;
       }
-
+      const processingNotification = Notify.create({
+        type: "info",
+        message: "Procesando archivos, por favor espera...",
+        spinner: true,
+        position: "bottom",
+        timeout: 3000, // La notificación no se cerrará automáticamente
+      });
       try {
         const responses = await Promise.allSettled(
           this.facturasAnidadas.map(async (factura, index) => {
@@ -545,18 +558,18 @@ export default {
 
         // Procesar los resultados
         this.mostrarNotificacion()
-     console.log(responses)
-     responses.forEach((result, index) =>{
-      if (result.status === "fulfilled" && result.value?.success=== 201){
-        alert ('Proceso Exitoso.');
-      }else{
-      }
-     });
+        console.log(responses)
+        responses.forEach((result, index) => {
+          if (result.status === "fulfilled" && result.value?.success === 201) {
+            alert('Proceso Exitoso.');
+          } else {
+          }
+        });
 
       } catch (error) {
         console.error("Error global inesperado:", error);
         alert("Ocurrió un error Global Inesperado al enviar las facturas simples.")
-      } 
+      }
     },
 
     limpiarBaseDeDatos() {
@@ -826,10 +839,9 @@ export default {
         return texto;
       }
 
-      doc.text(` ${factura.identificacion}`, offsetX - 55, offsetY + 13);
-      doc.text(` ${factura.identificacion}`, offsetX - 55, offsetY + 13);
-      doc.text(` ${factura.direccion}`, offsetX + 15, offsetY + 13);
-      doc.text(` ${factura.correo}`, offsetX - 65, offsetY + 21);
+      doc.text(` ${factura.identificacion}`, offsetX - 52, offsetY + 13);
+      const direlimitado = limitarCaracteres(factura.direccion, 25); doc.text(` ${direlimitado}`, offsetX + 3, offsetY + 13);
+      doc.text(` ${factura.email}`, offsetX - 61, offsetY + 21);
       doc.text(` ${factura.telefono}`, offsetX + 15, offsetY + 21);
       doc.text(` ${factura.codigo_producto}`, offsetX - 75, offsetY + 53);
       doc.text(` ${factura.cantidadProducto}`, offsetX - 43, offsetY + 53);

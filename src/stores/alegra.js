@@ -27,64 +27,40 @@ export const useFacturaStore = defineStore('factura', {
 
     // Procesar la cola de facturas
     async procesarCola() {
-    // console.log("Procesando archivos..."); // Mensaje al iniciar el procesamiento
-      this.facturasPendientes.sort((a, b) => {
-        const nombreA = a.client?.name?.toLowerCase() || "";
-        const nombreB = b.client?.name?.toLowerCase() || "";
-        return nombreA.localeCompare(nombreB);
-      });
-
-    // console.log(
-    //     "Facturas ordenadas alfabéticamente:",
-    //     JSON.parse(JSON.stringify(this.facturasPendientes))
-    //   );
-
-      const results = []; // Arreglo para almacenar resultados de cada factura
-
       while (this.facturasPendientes.length > 0 && !this.isSending) {
         this.isSending = true;
         const facturaData = this.facturasPendientes.shift(); // Saca la primera factura en la cola
-      // console.log("Procesando factura:", facturaData);
-
+    
         try {
-          // Paso 1: Obtener client_id
-          const clientId = await this.obtenerClientId(facturaData.identification);
-        // console.log("clientId obtenido:", clientId);
-          if (!clientId) {
-            throw new Error("No se pudo obtener client_id para el cliente.");
+          // Paso 1: Obtener datos del cliente
+          const clientData = await this.obtenerClientId(facturaData.identification);
+          if (!clientData || !clientData.id) {
+            throw new Error("No se pudo obtener el cliente asociado.");
           }
-
-          facturaData.client_id = clientId;
+    
+          facturaData.client_id = clientData.id; // Usado para preparar la factura
+          facturaData.clientData = clientData;  // Usado para mostrar en la interfaz
           facturaData.date = facturaData.fecha_elaboracion || "";
           facturaData.dueDate = facturaData.fecha_vencimiento || "";
-
+    
           // Paso 2: Procesar los ítems
           facturaData.items = await this.procesarItems(facturaData.items);
-
+    
           // Paso 3: Preparar y enviar la factura
           const preparedFactura = this.prepararFactura(facturaData);
-        console.log("Factura preparada para enviar:", preparedFactura);
-
+          console.log("Factura preparada para enviar:", preparedFactura);
+    
           const response = await this.enviarDatosAFactura(preparedFactura);
-        console.log("Respuesta del envío de la factura:", response);
-
-          results.push(response); // Almacenar la respuesta de esta factura
+          console.log("Respuesta del envío de la factura:", response);
+    
         } catch (error) {
-        console.error("Error en el proceso de envío de factura:", error.message);
-          results.push({ success: false, error: error.message });
+          console.error("Error en el proceso de envío de factura:", error.message);
         } finally {
           this.isSending = false; // Liberar el flag
         }
       }
-
-      if (results.every((res) => res.success)) {
-      console.log("Proceso exitoso"); // Mensaje cuando todas las facturas se procesan correctamente
-      } else {
-      console.log("Proceso completado con algunos errores.");
-      }
-
-      return results; // Retorna los resultados de todas las facturas procesadas
-    },
+    }
+    ,
 
     async procesarItems(items) {
       return await Promise.all(
@@ -161,11 +137,9 @@ export const useFacturaStore = defineStore('factura', {
     },
 
     prepararFactura(facturaData) {
-      const preparedFactura = {
+      return {
         client: {
-          id: facturaData.client_id,
-          name: facturaData.nombre,
-          identification: facturaData.identification,
+          id: facturaData.client_id, // Alegra necesita únicamente este campo
         },
         date: facturaData.date,
         dueDate: facturaData.dueDate,
@@ -182,21 +156,17 @@ export const useFacturaStore = defineStore('factura', {
           tax: item.tax || [],
         })),
         retentions: facturaData.retentions || [],
-        anotation: "Esta Factura se podrá cancelar en:\nBANCOLOMBIA en la cuenta de ahorro Numero 32200000480\nOFICINA PRINCIPAL ubicada Cra 8 No 16-14 o por el codigo QR nequi, el cual debes solicitar por Whatsapp\nLas PQR pueden ser interpuestas a través de las lineas telefónicas 3504632437 o mediante correo electrónico a SOPORTE@MIKROTECKSG.COM.",
-        termsConditions: "Esta factura se asimila en todos sus efectos a una letra de cambio de conformidad con el Art. 774 del código de comercio. Autorizo que en caso de incumplimiento de esta obligación sea reportado a las centrales de riesgo, Recargo por mora y reconexión de $5.000 el cual se vera reflejado en la siguiente facturación. MIKROTECK SAS. Empresa autorizada y vigilada por el MINTIC. Registro TIC 96003535\n",
+        anotation: facturaData.anotation || "",
+        termsConditions: facturaData.termsConditions || "",
         total: facturaData.total || 0,
       };
-
-
-    // console.log("Factura preparada:", preparedFactura);
-      return preparedFactura;
-    },
+    }
+    ,
 
     async obtenerClientId(identification) {
       const API_KEY = import.meta.env.VITE_ALEGRA_API_KEY;
-
+    
       try {
-      // console.log('Buscando clientId para identificación:', identification);
         const response = await fetch(`https://api.alegra.com/api/v1/contacts?identification=${identification}`, {
           method: 'GET',
           headers: {
@@ -205,12 +175,25 @@ export const useFacturaStore = defineStore('factura', {
           },
         });
         const data = await response.json();
-      // console.log('Respuesta de la API para clientId:', data);
-        return data[0]?.id || null;
+    
+        if (data && data.length > 0) {
+          const client = data[0]; // Toma el primer cliente encontrado
+          return {
+            id: client.id, // Este es obligatorio para Alegra
+            name: client.name || null,
+            identification: client.identification || null,
+            address: client.address || null,
+            email: client.email || null,
+            phone: client.phonePrimary || null,
+          };
+        } else {
+          return null; // No se encontró cliente
+        }
       } catch (error) {
-      // console.error("Error al obtener client_id:", error.message);
-        return null;
+        console.error("Error al obtener client_id:", error.message);
+        return null; // Manejo del error
       }
     },
+    
   },
 });
