@@ -347,87 +347,118 @@ export default {
     },
 
     async subirArchivo() {
-      const archivo = this.$refs.fileInput.files[0];
-      if (!archivo) {
-        alert('Por favor, selecciona un archivo CSV');
-        return;
+  const archivo = this.$refs.fileInput.files[0];
+  if (!archivo) {
+    alert('Por favor, selecciona un archivo CSV');
+    return;
+  }
+
+  const reader = new FileReader();
+
+  reader.onload = async (datos) => {
+    const contenido = datos.target.result;
+    const filas = contenido.split('\n').map(fila => fila.split(';'));
+
+    // Crear una lista para almacenar los errores por fila
+    const errores = [];
+
+    // Crear un array para almacenar las facturas simples y anidadas
+    const facturasSimples = [];
+    const facturasAnidadas = {};
+
+    for (const [index, fila] of filas.slice(1).entries()) {
+      if (fila.every(campo => campo.trim() === '')) {
+        continue; // Saltar filas vacías
       }
 
-      const reader = new FileReader();
+      // Asignar los valores de cada campo
+      const cantidadProducto = parseFloat(fila[3]) || 0;
+      const valor_unitario = parseFloat(fila[4]) || 0;
+      const iva = parseFloat(fila[5]) || 0;
+      const valorReteica = parseFloat(fila[9]) || 0;
+      const valor_retencion = parseFloat(fila[7]) || 0;
 
-      reader.onload = async (datos) => {
-        const contenido = datos.target.result;
-        const filas = contenido.split('\n').map(fila => fila.split(';'));
+      const identificacion = fila[1]; // Identificación
+      const nombre = fila[0]; // Nombre del cliente
+      const codigo_producto = fila[2];
+      const fecha_vencimiento = fila[11];
+      const fecha_elaboracion = fila[12];
+      const anidar = fila[13]?.trim().toLowerCase(); // Puede ser 'true', 'false' o vacío
 
-        // Crear un array para almacenar las facturas simples y anidadas
-        const facturasSimples = [];
-        const facturasAnidadas = {};
+      // Validación de campos obligatorios
+      const camposFaltantes = [];
+      if (!nombre) camposFaltantes.push("Nombre");
+      if (!identificacion) camposFaltantes.push("Identificación");
+      if (!codigo_producto) camposFaltantes.push("Código de producto");
+      if (isNaN(cantidadProducto) || cantidadProducto <= 0) camposFaltantes.push("Cantidad de producto");
+      if (isNaN(valor_unitario) || valor_unitario <= 0) camposFaltantes.push("Valor unitario");
+      if (!fecha_vencimiento) camposFaltantes.push("Fecha de vencimiento");
+      if (!fecha_elaboracion) camposFaltantes.push("Fecha de elaboración");
 
-        for (const fila of filas.slice(1)) {
-          if (fila.every(campo => campo.trim() === '')) {
-            continue; // Saltar filas vacías
-          }
+      // Revisamos el valor de 'anidar' para asegurarnos de que no esté vacío
+      if (anidar !== 'true' && anidar !== 'false') {
+        camposFaltantes.push("Anidar");
+      }
 
-          const cantidadProducto = parseFloat(fila[3]) || 0;
-          const valor_unitario = parseFloat(fila[4]) || 0;
-          const iva = parseFloat(fila[5]) || 0;
-          const valorReteica = parseFloat(fila[9]) || 0;
-          const valor_retencion = parseFloat(fila[7]) || 0;
+      if (camposFaltantes.length > 0) {
+        // Añadir los errores de la fila actual a la lista de errores
+        errores.push(` Dato # ${index + 2} Falta : ${camposFaltantes.join(', ')}`);
+        continue; // No procesar la fila si falta algún campo
+      }
 
-          const identificacion = fila[1]; // Identificación
-          const nombre = fila[0]; // Nombre del cliente
-          const codigo_producto = fila[2];
-          const fecha_vencimiento = fila[11];
-          const fecha_elaboracion = fila[12];
-          const anidar = fila[13]?.trim().toLowerCase() === 'true';
+      // Obtener información adicional del cliente
+      const clientInfo = await facturaStore.obtenerClientId(identificacion);
+      console.log('cliente de identificacion', clientInfo)
 
-          // Obtener información adicional del cliente
-          const clientInfo = await facturaStore.obtenerClientId(identificacion);
-          console.log('cliente de identificacion', clientInfo)
+      const factura = {
+        nombre,
+        identificacion,
+        codigo_producto,
+        cantidadProducto,
+        valor_unitario,
+        iva,
+        valor_retencion,
+        valorReteica,
+        fecha_vencimiento,
+        fecha_elaboracion,
+        total: this.calcularTotal(cantidadProducto, valor_unitario, iva, valorReteica, valor_retencion),
+        direccion: clientInfo.address.address || null,
+        email: clientInfo?.email || null,
+        telefono: clientInfo?.phone || null,
+      };
 
-          const factura = {
-            nombre,
-            identificacion,
-            codigo_producto,
-            cantidadProducto,
-            valor_unitario,
-            iva,
-            valor_retencion,
-            valorReteica,
-            fecha_vencimiento,
-            fecha_elaboracion,
-            total: this.calcularTotal(cantidadProducto, valor_unitario, iva, valorReteica, valor_retencion),
-            direccion: clientInfo.address.address || null,
-            email: clientInfo?.email || null,
-            telefono: clientInfo?.phone || null,
-          };
-
-          if (!anidar) {
-            // Facturas simples: agregarlas directamente
-            facturasSimples.push(factura);
-          } else {
-            // Facturas anidadas: agrupar por identificación
-            if (!facturasAnidadas[identificacion]) {
-              facturasAnidadas[identificacion] = { ...factura, items: [] };
-            }
-            facturasAnidadas[identificacion].items.push(factura);
-            facturasAnidadas[identificacion].total += factura.total;
-          }
+      if (anidar === 'false') {
+        // Facturas simples: agregarlas directamente
+        facturasSimples.push(factura);
+      } else {
+        // Facturas anidadas: agrupar por identificación
+        if (!facturasAnidadas[identificacion]) {
+          facturasAnidadas[identificacion] = { ...factura, items: [] };
         }
-
-        // Combinar las facturas simples y las anidadas para mostrar en la tabla
-        this.rows = [
-          ...facturasSimples,
-          ...Object.values(facturasAnidadas),
-        ];
-      };
-
-      reader.onerror = (error) => {
-        console.error("Error al leer el archivo:", error);
-      };
-
-      reader.readAsText(archivo);
+        facturasAnidadas[identificacion].items.push(factura);
+        facturasAnidadas[identificacion].total += factura.total;
+      }
     }
+
+    // Mostrar todos los errores si los hay
+    if (errores.length > 0) {
+      alert(`Se encontraron los siguientes errores en las líneas:\n\n${errores.join('\n')}`);
+      return; // Detener el proceso si hay errores
+    }
+
+    // Combinar las facturas simples y las anidadas para mostrar en la tabla
+    this.rows = [
+      ...facturasSimples,
+      ...Object.values(facturasAnidadas),
+    ];
+  };
+
+  reader.onerror = (error) => {
+    console.error("Error al leer el archivo:", error);
+  };
+
+  reader.readAsText(archivo);
+}
     ,
 
     mostrarNotificacion() {

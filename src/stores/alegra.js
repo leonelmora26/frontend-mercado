@@ -4,23 +4,19 @@ export const useFacturaStore = defineStore('factura', {
   state: () => ({
     facturaResponse: null,
     error: null,
-    facturasPendientes: [],  // Cola de facturas pendientes
-    isSending: false,        // Flag para saber si hay un envío en proceso
+    facturasPendientes: [],  
+    isSending: false,      
   }),
 
   actions: {
-    // Función principal para añadir facturas a la cola y procesarlas
      // Función principal para añadir facturas a la cola y procesarlas
      async enviarFactura(facturaData) {
       if (!facturaData || !facturaData.identification || !facturaData.items || facturaData.items.length === 0) {
       // console.error("Datos incompletos para la factura:", facturaData);
         return { success: false, error: "Datos incompletos para la factura" };
       }
-
     // console.log("Factura recibida para enviar:", facturaData);
-      this.facturasPendientes.push(facturaData); // Añadir factura a la cola
-
-      // Procesar la cola y esperar la respuesta
+      this.facturasPendientes.push(facturaData); 
       const result = await this.procesarCola();
       return result;
     },
