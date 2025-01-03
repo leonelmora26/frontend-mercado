@@ -65,12 +65,12 @@ export const useFacturaStore = defineStore('factura', {
           // console.log("Procesando ítem:", item);
             const itemData = await this.obtenerItem(item.codigo);
             if (!itemData) throw new Error(`Ítem no encontrado: ${item.codigo}`);
-
+            console.log('item data',itemData)
             const iva = item.tax?.find((t) => t.type === "IVA")?.amount || 0;
-
             return {
               id: itemData.id,
               name: itemData.name || "Sin nombre",
+              description: itemData.description || "Descripción no proporcionado",
               price: item.price || itemData.price[0]?.price || 0,
               quantity: item.quantity || 1,
               unit: item.unit || "service",
@@ -152,8 +152,8 @@ export const useFacturaStore = defineStore('factura', {
           tax: item.tax || [],
         })),
         retentions: facturaData.retentions || [],
-        anotation: facturaData.anotation || "",
-        termsConditions: facturaData.termsConditions || "",
+        anotation: "Esta Factura se podrá cancelar en:\nBANCOLOMBIA en la cuenta de ahorro Numero 32200000480\nOFICINA PRINCIPAL ubicada Cra 8 No 16-14 o por el codigo QR nequi, el cual debes solicitar por Whatsapp\nLas PQR pueden ser interpuestas a través de las lineas telefónicas 3504632437 o mediante correo electrónico a SOPORTE@MIKROTECKSG.COM.",
+        termsConditions: "Esta factura se asimila en todos sus efectos a una letra de cambio de conformidad con el Art. 774 del código de comercio. Autorizo que en caso de incumplimiento de esta obligación sea reportado a las centrales de riesgo, Recargo por mora y reconexión de $5.000 el cual se vera reflejado en la siguiente facturación. MIKROTECK SAS. Empresa autorizada y vigilada por el MINTIC. Registro TIC 96003535\n",
         total: facturaData.total || 0,
       };
     }
