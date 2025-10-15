@@ -1,9 +1,8 @@
 import { createRouter, createWebHashHistory } from "vue-router";
-import documentos from "../components/documentos.vue"
-import factura from "../components/factura.vue"
+import producto from "../components/producto.vue"
 const routes=[
-    {path:"/prueba", component: documentos,},
-    {path:"/", component: factura,}
+    {path:"/", component: producto,},
+    // {path:"/", component: factura,}
 ];
 
 export const router = createRouter({

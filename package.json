@@ -11,6 +11,8 @@
   "dependencies": {
     "@quasar/extras": "^1.16.12",
     "axios": "^1.7.4",
+    "boostrap": "^2.0.0",
+    "bootstrap": "^5.3.7",
     "floating-vue": "^5.2.2",
     "jspdf": "^2.5.2",
     "notyf": "^3.10.0",
