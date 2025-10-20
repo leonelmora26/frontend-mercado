@@ -2,7 +2,7 @@
   <q-layout view="hHh lpR lFf" class="contenedor">
 
     <!-- Columna izquierda -->
-    <div class="columna" style="display: flex;align-items: center;justify-content: center;">
+    <div class="columna" style="display: flex;align-items: center;justify-content: center;margin-right: 5%">
       <q-page-container>
         <q-card class="card_izquierda" @click="modalProducto = true" style="background-color: #9FA8DA;">
           <q-card-section>
@@ -12,49 +12,73 @@
         </q-card>
       </q-page-container>
     </div>
-    f
+
     <!-- Columna derecha -->
-    <div class="columna">
-      <h1>HOLA AMOR</h1>
+    <div class="columna" style="display: flex;align-items: center;">
+      <div class="padre" style="height: 100%;display: flex; justify-content: center;flex-direction: column;">
+        <button class="producto" style="height: 25%;" @click="modalListaProductos = true">
+          Productos
+        </button>
+        <button class="opcion" style="height: 25%;"> Mejor Opcion
+        </button>
+        <button class="comparacion" style="height: 25%;"> Comparacion De Productos </button>
+      </div>
+
     </div>
 
     <!-- MODAL PARA AGREGAR PRODUCTO -->
-    <!-- Modal -->
-    <q-dialog v-model="modalProducto" persistent position="right">
-      <q-card style="display: flex;align-items: center;justify-content: center;">
+<q-dialog v-model="modalProducto">
+  <q-card class="modal-producto">
+    <!-- Columna izquierda (Imagen) -->
+    <div class="col-5 flex flex-center column bg-light">
+      <q-avatar size="150px" class="q-mb-md">
+        <img src="https://cdn.quasar.dev/img/avatar.png" alt="Producto" />
+      </q-avatar>
+      <q-btn label="Subir Imagen" color="primary" flat />
+    </div>
 
-        <!-- Columna izquierda (Imagen) -->
-        <div class="col-5 flex flex-center column bg-light">
-          <q-avatar size="150px" class="q-mb-md">
-            <img src="https://cdn.quasar.dev/img/avatar.png" alt="Producto" />
-          </q-avatar>
-          <q-btn label="Subir Imagen" color="primary" flat />
-        </div>
+    <!-- Columna derecha (Formulario) -->
+    <q-card-section class="col-7 q-pa-md">
+      <h3 class="titulo">Nuevo Producto</h3>
+      <q-input v-model="producto.nombre" label="Nombre" outlined dense class="q-mb-sm" />
+      <q-select v-model="producto.local" :options="['D1', 'ARA', 'DolarCity', 'otro']" label="Local" outlined dense class="q-mb-sm" />
+      <q-input v-model="producto.cantidad" type="number" label="Cantidad" outlined dense class="q-mb-sm" />
+      <q-select v-model="producto.unidadMedida" :options="['Kg', 'Gr', 'Ml', 'L']" label="Unidad de Medida" outlined dense class="q-mb-sm" />
+      <q-input v-model="producto.precioUnitario" type="number" label="Valor $" outlined dense class="q-mt-md" />
 
-        <!-- Columna derecha (Formulario) -->
-        <q-card-section class="col-7 q-pa-md">
-          <!-- Agregar producto -->
-          <h3 class="titulo">Nuevo Producto</h3>
-          <!-- Nombre del producto -->
-          <q-input v-model="producto.nombre" label="Nombre" outlined dense class="q-mb-sm" />
-          <!-- Nombre del local -->
-          <q-select v-model="producto.local" :options="['D1', 'ARA', 'DolarCity', 'otro']" label="Local" outlined dense
-            class="q-mb-sm" />
-          <!-- Cantidad -->
-          <q-input v-model="producto.cantidad" type="number" label="Cantidad" outlined dense class="q-mb-sm" />
-          <!-- Selector de medida -->
-          <q-select v-model="producto.unidadMedida" :options="['Kg', 'Gr', 'Ml', 'L']" label="Unidad de Medida" outlined
-            dense class="q-mb-sm" />
-          <!-- Valor -->
-          <q-input v-model="producto.precioUnitario" type="number" label="Valor $" outlined dense class="q-mt-md" />
-          <!-- Botones -->
-          <div class="q-mt-lg row justify-end q-gutter-sm">
-            <q-btn flat label="Cancelar" color="negative" v-close-popup />
-            <q-btn label="Guardar" color="positive" @click="guardarProductos" />
-          </div>
+      <div class="q-mt-lg row justify-end q-gutter-sm">
+        <q-btn flat label="Cancelar" color="negative" v-close-popup />
+        <q-btn label="Guardar" color="positive" @click="guardarProductos" />
+      </div>
+    </q-card-section>
+  </q-card>
+</q-dialog>
+
+
+    <q-dialog v-model="modalListaProductos">
+      <q-card style="width: 80vw; max-width: 900px;">
+        <q-card-section class="bg-primary text-white">
+          <div class="text-h6" style="text-align: center;">Lista de Productos</div>
         </q-card-section>
+
+        <q-card-section>
+          <q-table :rows="productos" :columns="columns" row-key="codigo" flat bordered separator="cell"
+            style="height: 400px;">
+            <!-- Columna personalizada para eliminar -->
+            <template v-slot:body-cell-acciones="props" style="text-align: center;">
+              <q-td :props="props" align="center">
+                <q-btn color="negative" icon="delete" flat dense round @click="eliminar(props.row)" />
+              </q-td>
+            </template>
+          </q-table>
+        </q-card-section>
+
+        <q-card-actions align="right">
+          <q-btn flat label="Cerrar" color="negative" v-close-popup />
+        </q-card-actions>
       </q-card>
     </q-dialog>
+
 
   </q-layout>
 </template>
@@ -65,14 +89,26 @@ import { ref, onMounted } from "vue"
 import { useProductoStore } from "../stores/producto.js"
 import fondo from "../assets/fondo.png"
 import { useQuasar } from "quasar"
-
 const $q = useQuasar()
 const leftDrawerOpen = ref(false);
 const modalProducto = ref(false);
+const modalListaProductos = ref(false);
 const productos = ref([]);
 const rows = ref([]);
 const productoStore = useProductoStore();
-
+const columns = [
+  { name: 'nombre', label: 'Nombre', field: 'nombre', align: 'center' },
+  { name: 'local', label: 'Local', field: 'local', align: 'center' },
+  { name: 'cantidad', label: 'Cantidad', field: 'cantidad', align: 'center' },
+  { name: 'unidadMedida', label: 'Unidad', field: 'unidadMedida', align: 'center' },
+  { name: 'precioUnitario', label: 'Precio Unitario', field: 'precioUnitario', align: 'center' },
+  {
+    name: 'acciones',
+    label: 'Acciones',
+    align: 'center',
+    field: 'acciones',
+  }
+];
 
 async function obtenerinfo() {
   try {
@@ -148,22 +184,24 @@ async function guardarProductos() {
   }
 }
 
-
-
 async function eliminar(id) {
   try {
-    await productoStore.deleteproducto(id);
+    await productoStore.deleteproducto(producto.codigo);
     $q.notify({
-      type: "positive",
-      message: "Producto eliminado correctamente"
+      type: 'positive',
+      message: 'Producto eliminado correctamente'
     });
+    await obtenerinfo(); // 🔁 recargar tabla
   } catch (error) {
+    console.error('❌ Error al eliminar producto:', error);
     $q.notify({
-      type: "negative",
-      message: "Error eliminando producto"
+      type: 'negative',
+      message: 'No se pudo eliminar el producto'
     });
   }
 }
+
+
 onMounted(async () => {
   console.log("✅ onMounted se ejecutó");
   obtenerinfo();
@@ -245,6 +283,14 @@ body {
   justify-content: center;
 }
 
+
+.modal-producto {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-left: 30%;
+}
+
 .nuevo {
   font-family: "Comic Sans MS", cursive, sans-serif;
   font-size: 28px;
@@ -267,11 +313,67 @@ body {
   box-sizing: border-box;
 }
 
+.padre {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 25px;
+  width: 100%;
+  height: 100%;
+  padding: 20px;
+}
 
-.my-sticky-header-table thead tr th {
-  background: #00b4ff;
-  position: sticky;
-  top: 0;
-  z-index: 1;
+/* 🔘 Estilo base de botones */
+button {
+  font-family: "Georgia", serif;
+  font-weight: bold;
+  font-size: 22px;
+  padding: 20px 0;
+  width: 100%;
+  max-width: 450px;
+  border: none;
+  border-radius: 20px;
+  box-shadow: 3px 3px 10px rgba(0, 0, 0, 0.2);
+  cursor: pointer;
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+/* 🎨 Colores */
+.producto {
+  background-color: #c1a2c7;
+  color: #2d2d2d;
+  align-self: flex-start; /* Izquierda */
+}
+
+.opcion {
+  background-color: #f8e5b9;
+  color: #2d2d2d;
+  align-self: flex-end; /* Derecha */
+}
+
+.comparacion {
+  background-color: #f8b8a0;
+  color: #2d2d2d;
+  align-self: flex-start; /* Izquierda */
+}
+
+/* ✨ Efecto hover */
+button:hover {
+  transform: scale(1.05);
+  box-shadow: 5px 5px 15px rgba(0, 0, 0, 0.25);
+}
+
+/* 📱 Responsivo */
+@media (max-width: 768px) {
+  button {
+    width: 90%;
+    font-size: 18px;
+  }
+
+  .producto,
+  .opcion,
+  .comparacion {
+    align-self: center; /* En pantallas pequeñas, todos centrados */
+  }
 }
 </style>

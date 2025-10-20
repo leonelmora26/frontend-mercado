@@ -9,6 +9,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@fortawesome/fontawesome-free": "^7.1.0",
     "@quasar/extras": "^1.16.12",
     "axios": "^1.7.4",
     "boostrap": "^2.0.0",
