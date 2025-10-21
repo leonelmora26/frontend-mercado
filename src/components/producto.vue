@@ -27,32 +27,34 @@
     </div>
 
     <!-- MODAL PARA AGREGAR PRODUCTO -->
-<q-dialog v-model="modalProducto">
-  <q-card class="modal-producto">
-    <!-- Columna izquierda (Imagen) -->
-    <div class="col-5 flex flex-center column bg-light">
-      <q-avatar size="150px" class="q-mb-md">
-        <img src="https://cdn.quasar.dev/img/avatar.png" alt="Producto" />
-      </q-avatar>
-      <q-btn label="Subir Imagen" color="primary" flat />
-    </div>
+    <q-dialog v-model="modalProducto">
+      <q-card class="modal-producto">
+        <!-- Columna izquierda (Imagen) -->
+        <div class="col-5 flex flex-center column bg-light">
+          <q-avatar size="150px" class="q-mb-md">
+            <img src="https://cdn.quasar.dev/img/avatar.png" alt="Producto" />
+          </q-avatar>
+          <q-btn label="Subir Imagen" color="primary" flat />
+        </div>
 
-    <!-- Columna derecha (Formulario) -->
-    <q-card-section class="col-7 q-pa-md">
-      <h3 class="titulo">Nuevo Producto</h3>
-      <q-input v-model="producto.nombre" label="Nombre" outlined dense class="q-mb-sm" />
-      <q-select v-model="producto.local" :options="['D1', 'ARA', 'DolarCity', 'otro']" label="Local" outlined dense class="q-mb-sm" />
-      <q-input v-model="producto.cantidad" type="number" label="Cantidad" outlined dense class="q-mb-sm" />
-      <q-select v-model="producto.unidadMedida" :options="['Kg', 'Gr', 'Ml', 'L']" label="Unidad de Medida" outlined dense class="q-mb-sm" />
-      <q-input v-model="producto.precioUnitario" type="number" label="Valor $" outlined dense class="q-mt-md" />
+        <!-- Columna derecha (Formulario) -->
+        <q-card-section>
+          <h3 class="titulo">Nuevo Producto</h3>
+          <q-input v-model="producto.nombre" label="Nombre" outlined dense class="q-mb-sm" />
+          <q-select v-model="producto.local" :options="['D1', 'ARA', 'DolarCity', 'otro']" label="Local" outlined dense
+            class="q-mb-sm" />
+          <q-input v-model="producto.cantidad" type="number" label="Cantidad" outlined dense class="q-mb-sm" />
+          <q-select v-model="producto.unidadMedida" :options="['Kg', 'Gr', 'Ml', 'L']" label="Unidad de Medida" outlined
+            dense class="q-mb-sm" />
+          <q-input v-model="producto.precioUnitario" type="number" label="Valor $" outlined dense class="q-mt-md" />
 
-      <div class="q-mt-lg row justify-end q-gutter-sm">
-        <q-btn flat label="Cancelar" color="negative" v-close-popup />
-        <q-btn label="Guardar" color="positive" @click="guardarProductos" />
-      </div>
-    </q-card-section>
-  </q-card>
-</q-dialog>
+          <div class="q-mt-lg row justify-end q-gutter-sm">
+            <q-btn flat label="Cancelar" color="negative" v-close-popup />
+            <q-btn label="Guardar" color="positive" @click="guardarProductos" />
+          </div>
+        </q-card-section>
+      </q-card>
+    </q-dialog>
 
 
     <q-dialog v-model="modalListaProductos">
@@ -283,12 +285,18 @@ body {
   justify-content: center;
 }
 
+.q-card.modal-producto {
+  min-width: unset !important;
+  max-width: 100% !important;
+  width: 60%;
+  margin-left: 35%;
+}
 
 .modal-producto {
   display: flex;
   align-items: center;
   justify-content: center;
-  margin-left: 30%;
+  width: 90%;
 }
 
 .nuevo {
@@ -342,19 +350,22 @@ button {
 .producto {
   background-color: #c1a2c7;
   color: #2d2d2d;
-  align-self: flex-start; /* Izquierda */
+  align-self: flex-start;
+  /* Izquierda */
 }
 
 .opcion {
   background-color: #f8e5b9;
   color: #2d2d2d;
-  align-self: flex-end; /* Derecha */
+  align-self: flex-end;
+  /* Derecha */
 }
 
 .comparacion {
   background-color: #f8b8a0;
   color: #2d2d2d;
-  align-self: flex-start; /* Izquierda */
+  align-self: flex-start;
+  /* Izquierda */
 }
 
 /* ✨ Efecto hover */
@@ -373,7 +384,8 @@ button:hover {
   .producto,
   .opcion,
   .comparacion {
-    align-self: center; /* En pantallas pequeñas, todos centrados */
+    align-self: center;
+    /* En pantallas pequeñas, todos centrados */
   }
 }
 </style>
